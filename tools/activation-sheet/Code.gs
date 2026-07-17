@@ -133,10 +133,25 @@ function handleIssue(data) {
 
 // Ký token đúng định dạng app: VDL1.<payloadBase64url>.<sigBase64url>
 function signToken(payload, privateKey) {
+  var pem = normalizePem_(privateKey);
   var payloadEncoded = base64UrlEncode_(Utilities.newBlob(JSON.stringify(payload)).getBytes());
-  var sigBytes = Utilities.computeRsaSha256Signature(payloadEncoded, privateKey);
+  var sigBytes = Utilities.computeRsaSha256Signature(payloadEncoded, pem);
   var sigEncoded = base64UrlEncode_(sigBytes);
   return TOKEN_PREFIX + '.' + payloadEncoded + '.' + sigEncoded;
+}
+
+// Dựng lại PEM chuẩn (xuống dòng 64 ký tự) phòng khi Script Properties
+// làm mất dấu xuống dòng khi lưu key.
+function normalizePem_(raw) {
+  var s = String(raw || '').trim();
+  var typeMatch = s.match(/-----BEGIN ([A-Z0-9 ]+?)-----/);
+  var type = typeMatch ? typeMatch[1] : 'PRIVATE KEY';
+  var body = s
+    .replace(/-----BEGIN [A-Z0-9 ]+-----/, '')
+    .replace(/-----END [A-Z0-9 ]+-----/, '')
+    .replace(/\s+/g, '');
+  var lines = body.match(/.{1,64}/g) || [];
+  return '-----BEGIN ' + type + '-----\n' + lines.join('\n') + '\n-----END ' + type + '-----';
 }
 
 function base64UrlEncode_(bytes) {
