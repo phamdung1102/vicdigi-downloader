@@ -1,18 +1,5 @@
-# VICdigi Downloader — Trang tải về
+# VICdigi Downloader
 
-Ứng dụng Windows tải video đa nền tảng: YouTube, Facebook, TikTok, Instagram, Twitter/X, Vimeo, torrent.
+Repo nay chi dung lam kenh phan phoi ban cap nhat tu dong cho ung dung VICdigi Downloader da duoc cai dat va kich hoat ban quyen.
 
-## 📥 Tải bản mới nhất
-
-👉 **[Tải tại mục Releases](https://github.com/phamdung1102/vicdigi-downloader/releases/latest)**
-
-- **`VICdigi-Downloader-vX.X.X-Setup.exe`** — bản cài đặt (khuyến nghị, có tự động cập nhật)
-- **`VICdigi-Downloader-vX.X.X-Portable.exe`** — bản chạy trực tiếp không cần cài (không tự cập nhật)
-
-## 🔄 Tự động cập nhật
-
-Bản Setup sau khi cài sẽ tự kiểm tra và tải bản mới — bạn không cần quay lại trang này.
-
----
-
-*Repo này chỉ chứa file phát hành. Mọi thắc mắc về license/kích hoạt vui lòng liên hệ người bán.*
+Ung dung khong phan phoi cong khai tai day. De mua/nhan ban cai dat, vui long lien he truc tiep nguoi ban.
