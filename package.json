@@ -14,6 +14,7 @@
     "test:queue:lifecycle": "node scripts/test-queue-lifecycle.js",
     "test:integration:social": "node scripts/test-social-integration.js",
     "build": "electron-builder --config electron-builder.yml",
+    "release": "node scripts/release.js",
     "build-win": "electron-builder --win --config electron-builder.yml",
     "pack": "electron-builder --dir --config electron-builder.yml"
   },
@@ -43,6 +44,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR-GITHUB-USERNAME/vicdigi-downloader"
+    "url": "https://github.com/phamdung1102/vicdigi-downloader"
   }
 }

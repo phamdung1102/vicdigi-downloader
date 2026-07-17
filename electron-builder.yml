@@ -6,14 +6,17 @@ directories:
   output: dist
 
 # ── Auto-update qua GitHub Releases ──────────────────────────
-# ⚠️ SỬA owner thành username GitHub của bạn trước khi build.
-# electron-builder sẽ ghi thông tin này vào app-update.yml trong app,
-# electron-updater dùng nó để check bản mới tại:
-#   https://github.com/<owner>/<repo>/releases
+# Repo public CHỈ chứa file cài đặt (source code không đưa lên GitHub).
+# electron-builder ghi thông tin này vào app-update.yml trong app;
+# electron-updater check bản mới tại:
+#   https://github.com/phamdung1102/vicdigi-downloader/releases
+# releaseType: release -> `npm run release` đăng bản mới lên luôn,
+# không cần vào GitHub bấm publish draft.
 publish:
   provider: github
-  owner: YOUR-GITHUB-USERNAME
+  owner: phamdung1102
   repo: vicdigi-downloader
+  releaseType: release
 
 # Files đưa vào app.asar
 files:
