@@ -1,0 +1,64 @@
+appId: com.vicdigi.license-admin
+productName: VICdigi License Admin
+copyright: Copyright © 2024-2026 AndrewPham
+
+directories:
+  output: dist-license-admin
+
+files:
+  - package.json
+  - tools/license-admin/**/*
+  - src/core/licensing/license-token.js
+  - assets/**/*
+  - node_modules/**/*
+  - "!dist/**"
+  - "!dist-license-admin/**"
+  - "!.local/**"
+  - "!scripts/**"
+  - "!config/**"
+  - "!*.ps1"
+  - "!*.bat"
+  - "!*.conf"
+
+extraResources:
+  - from: ".local/license-private.pem"
+    to: "license-private.pem"
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+
+compression: normal
+removePackageScripts: true
+
+extraMetadata:
+  main: tools/license-admin/main.js
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  icon: assets/icon.ico
+  publisherName: "VICdigi"
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: VICdigi License Admin
+  deleteAppDataOnUninstall: false
+  menuCategory: true
+  artifactName: "${productName}-v${version}-Setup.exe"
+
+portable:
+  artifactName: "${productName}-v${version}-Portable.exe"

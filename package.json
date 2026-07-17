@@ -1,0 +1,48 @@
+{
+  "name": "vicdigi-downloader",
+  "version": "8.0.0",
+  "description": "VICdigi Multi-Platform Downloader v8.0 - YouTube, Instagram, TikTok, Facebook, Twitter/X, Vimeo",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "license-admin": "electron tools/license-admin/main.js",
+    "build:license-admin": "electron-builder --config electron-builder-license-admin.yml",
+    "smoke:backend": "node scripts/smoke-backend.js && node scripts/test-queue-lifecycle.js",
+    "smoke:renderer": "node scripts/smoke-renderer.js",
+    "smoke": "npm run smoke:backend && npm run smoke:renderer",
+    "test:queue:lifecycle": "node scripts/test-queue-lifecycle.js",
+    "test:integration:social": "node scripts/test-social-integration.js",
+    "build": "electron-builder --config electron-builder.yml",
+    "build-win": "electron-builder --win --config electron-builder.yml",
+    "pack": "electron-builder --dir --config electron-builder.yml"
+  },
+  "keywords": [
+    "youtube",
+    "downloader",
+    "electron",
+    "video",
+    "subtitle",
+    "vicdigi",
+    "tiktok",
+    "instagram"
+  ],
+  "author": "AndrewPham",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.8.9",
+    "extract-zip": "^2.0.1",
+    "fs-extra": "^11.2.0",
+    "webtorrent": "^2.8.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR-GITHUB-USERNAME/vicdigi-downloader"
+  }
+}

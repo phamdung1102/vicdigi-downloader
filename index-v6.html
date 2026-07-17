@@ -1,0 +1,720 @@
+﻿<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob: file:; connect-src 'self' https:; media-src 'self' https: data: blob:; font-src 'self' data:;">
+<title>VICdigi Downloader v8.0</title>
+<link rel="stylesheet" href="./src/renderer/v6.css">
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ══════════════════════════════════════════════════════
+       HEADER
+  ══════════════════════════════════════════════════════ -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-icon">⬇</div>
+      <div class="brand-name">VICdigi</div>
+    </div>
+
+    <!-- Central URL bar — dùng chung cho cả 2 tab -->
+    <div class="header-url-bar">
+      <span class="url-icon" id="urlIcon">🔗</span>
+      <input id="urlInput" type="text"
+        placeholder="Dán URL: YouTube · TikTok · Instagram · Facebook · Vimeo · magnet · .torrent…"
+        autocomplete="off" spellcheck="false" />
+      <!-- Nút Lấy thông tin (tab single) -->
+      <button class="btn-info-sm" id="getInfoBtn" disabled>
+        <span>🔍</span>
+        <span id="getInfoLabel">Lấy thông tin</span>
+      </button>
+      <!-- Nút Quét (tab batch) — ẩn mặc định -->
+      <button class="btn-info-sm" id="scanBtnHeader" style="display:none;">
+        <span>🔍</span>
+        <span>Quét</span>
+      </button>
+    </div>
+
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════
+       SIDEBAR
+  ══════════════════════════════════════════════════════ -->
+  <nav class="sidebar">
+    <div class="nav-section">Tải xuống</div>
+
+    <div class="nav-item active" id="nav-single">
+      <span class="nav-icon">🎬</span>
+      <span>Video đơn</span>
+    </div>
+    <div class="nav-item" id="nav-batch">
+      <span class="nav-icon">📦</span>
+      <span>Hàng loạt</span>
+    </div>
+
+    <div class="sidebar-divider"></div>
+    <div class="nav-section">Quản lý</div>
+
+    <div class="nav-item" id="nav-history">
+      <span class="nav-icon">📜</span>
+      <span>Lịch sử</span>
+      <span class="nav-badge" id="historyBadge">0</span>
+    </div>
+
+    <div class="sidebar-divider"></div>
+    <div class="nav-section">Hệ thống</div>
+
+    <div class="nav-item" id="nav-settings">
+      <span class="nav-icon">⚙️</span>
+      <span>Cài đặt</span>
+    </div>
+    <div class="nav-item" id="nav-license">
+      <span class="nav-icon">🛡️</span>
+      <span>Bản quyền</span>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="sidebar-theme-btn" id="themeToggleBtn" title="Đổi giao diện">
+        <span class="nav-icon" id="themeToggleIcon">🌙</span>
+        <span id="themeToggleLabel">Giao diện tối</span>
+      </button>
+    </div>
+
+    <!-- yt-dlp status — ẩn khỏi UI, chỉ giữ id để JS dùng nội bộ -->
+    <div class="sidebar-footer" style="display:none;">
+      <div class="ytdlp-dot ok" id="ytdlpDot"></div>
+      <div id="ytdlpVer"></div>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════════════
+       CONTENT
+  ══════════════════════════════════════════════════════ -->
+  <main class="content">
+
+    <!-- STATUS -->
+    <div class="status" id="statusMsg"></div>
+
+    <!-- ════════════════════════════════════════════════
+         TAB: TẢI ĐƠN
+    ════════════════════════════════════════════════ -->
+    <div class="tab-panel active" id="tab-single">
+
+      <!-- Folder row -->
+      <div class="folder-row">
+        <input class="field" id="folderInput" type="text" placeholder="Chọn thư mục lưu file…" readonly />
+        <button class="btn btn-ghost btn-sm" id="selectFolderBtn">📁 Thư mục</button>
+        <button class="btn btn-ghost btn-sm" id="pickTorrentBtn">🧲 Torrent</button>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-head">
+          <span class="progress-label" id="progressLabel">Đang xử lý…</span>
+          <span class="progress-pct" id="progressPct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+
+      <!-- Video info card -->
+      <div class="card" id="videoCard" style="display:none;">
+        <div class="video-card">
+          <div class="thumb-wrap">
+            <img class="thumb-img" id="videoThumb" alt="" style="display:none;" />
+            <div class="thumb-ph" id="thumbPh">🎬</div>
+            <div class="thumb-duration" id="thumbDuration" style="display:none;"></div>
+          </div>
+          <div class="video-meta">
+            <div class="video-title" id="videoTitle">—</div>
+            <div class="chips" id="metaChips">
+              <span class="chip" id="metaAuthor">—</span>
+              <span class="chip" id="metaViews">—</span>
+              <span class="chip quality-hi" id="metaMaxQ" style="display:none;">—</span>
+              <span class="chip platform" id="metaPlatform" style="display:none;">—</span>
+            </div>
+            <div class="quality-pills" id="qualityPills"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video download -->
+      <div class="card">
+        <div class="card-title">📹 Tải Video / Audio</div>
+        <p style="font-size:11px;color:var(--txt-lo);line-height:1.6;margin-bottom:9px;">
+          Hỗ trợ cả magnet link và file <code>.torrent</code>. Với torrent, app sẽ tải qua Download Center thay vì bước lấy thông tin video.
+        </p>
+        <div class="dl-grid" style="margin-bottom:9px;">
+          <div class="field-wrap">
+            <label class="field-label">Định dạng</label>
+            <select class="field" id="videoFormat">
+              <option value="mp4">📹 MP4 (Video)</option>
+              <option value="mp3">🎵 MP3 (Audio)</option>
+            </select>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Chất lượng</label>
+            <select class="field" id="videoQuality">
+              <option value="4k">4K (2160p)</option>
+              <option value="1440p">2K (1440p)</option>
+              <option value="1080p" selected>1080p Chuẩn cao ⭐</option>
+              <option value="720p">720p HD</option>
+              <option value="480p">480p Tiêu chuẩn</option>
+              <option value="360p">360p</option>
+              <option value="best">Cao nhất sẵn có</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" id="downloadVideoBtn" disabled>
+          ⬇ Tải Video
+        </button>
+      </div>
+
+      <!-- Subtitle + Thumbnail -->
+      <div class="sub-thumb-row">
+
+        <!-- Subtitle -->
+        <div class="card">
+          <div class="card-title">📝 Phụ đề</div>
+          <div class="dl-grid" style="margin-bottom:9px;">
+            <div class="field-wrap">
+              <label class="field-label">Ngôn ngữ</label>
+              <select class="field" id="subtitleLang">
+                  <option value="auto">🌍 Tự nhận diện</option>
+                <optgroup label="──── Châu Á ────">
+                  <option value="vi">🇻🇳 Tiếng Việt</option>
+                  <option value="zh">🇨🇳 中文 (Giản thể)</option>
+                  <option value="zh-TW">🇹🇼 中文 (Phồn thể)</option>
+                  <option value="ja">🇯🇵 日本語</option>
+                  <option value="ko">🇰🇷 한국어</option>
+                  <option value="th">🇹🇭 ภาษาไทย</option>
+                  <option value="id">🇮🇩 Bahasa Indonesia</option>
+                  <option value="ms">🇲🇾 Bahasa Melayu</option>
+                  <option value="hi">🇮🇳 हिन्दी</option>
+                  <option value="tl">🇵🇭 Filipino</option>
+                </optgroup>
+                <optgroup label="──── Châu Âu ────">
+                  <option value="en">🇺🇸 English (US)</option>
+                  <option value="en-GB">🇬🇧 English (UK)</option>
+                  <option value="fr">🇫🇷 Français</option>
+                  <option value="de">🇩🇪 Deutsch</option>
+                  <option value="es">🇪🇸 Español</option>
+                  <option value="it">🇮🇹 Italiano</option>
+                  <option value="pt">🇵🇹 Português</option>
+                  <option value="pt-BR">🇧🇷 Português (BR)</option>
+                  <option value="ru">🇷🇺 Русский</option>
+                  <option value="nl">🇳🇱 Nederlands</option>
+                  <option value="pl">🇵🇱 Polski</option>
+                  <option value="tr">🇹🇷 Türkçe</option>
+                  <option value="uk">🇺🇦 Українська</option>
+                </optgroup>
+                <optgroup label="──── Trung Đông / Châu Phi ────">
+                  <option value="ar">🇸🇦 العربية</option>
+                  <option value="fa">🇮🇷 فارسی</option>
+                  <option value="he">🇮🇱 עברית</option>
+                  <option value="sw">🇰🇪 Kiswahili</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Định dạng</label>
+              <select class="field" id="subtitleFormat">
+                <option value="both">SRT + TXT</option>
+                <option value="srt">SRT</option>
+                <option value="txt">TXT</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full btn-sm" id="downloadSubtitleBtn" disabled>
+            ⬇ Tải Phụ đề
+          </button>
+        </div>
+
+        <!-- Thumbnail -->
+        <div class="card" style="display:flex;flex-direction:column;gap:9px;">
+          <div class="card-title">🖼️ Ảnh bìa</div>
+          <p style="font-size:11px;color:var(--txt-lo);line-height:1.55;flex:1;">
+            Tải ảnh bìa chất lượng cao nhất có sẵn (ưu tiên `maxresdefault`, dự phòng `hqdefault`)
+          </p>
+          <button class="btn btn-ghost btn-full btn-sm" id="downloadThumbnailBtn" disabled>
+            ⬇ Tải Ảnh bìa
+          </button>
+        </div>
+
+      </div><!-- /sub-thumb-row -->
+
+    </div><!-- /tab-single -->
+
+
+    <!-- ════════════════════════════════════════════════
+         TAB: TẢI HÀNG LOẠT
+    ════════════════════════════════════════════════ -->
+    <div class="tab-panel" id="tab-batch">
+
+      <!-- ── Nguồn URL: 3 chế độ ── -->
+      <div class="card">
+        <div class="card-title">🔗 Nguồn URL</div>
+        <!-- Tab switcher -->
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          <button class="batch-src-tab active" id="srcTabChannel">📺 Kênh / Danh sách phát</button>
+          <button class="batch-src-tab" id="srcTabFacebook">Facebook Page/Reels</button>
+          <button class="batch-src-tab" id="srcTabLinks">📋 Dán nhiều link</button>
+          <button class="batch-src-tab" id="srcTabFile">📄 Nhập file .txt</button>
+        </div>
+
+        <!-- Chế độ: Kênh/Danh sách phát (dùng ô URL trên header) -->
+        <div id="srcPanelChannel">
+          <p style="font-size:11.5px;color:var(--txt-mid);line-height:1.6;">
+            Dán URL kênh hoặc playlist vào <b style="color:var(--accent)">ô URL trên header</b> rồi nhấn <b style="color:var(--accent)">🔍 Quét</b>
+          </p>
+        </div>
+
+        <!-- Chế độ: Quét Facebook Page/Reels bằng browser ẩn -->
+        <div id="srcPanelFacebook" style="display:none;">
+          <p style="font-size:11.5px;color:var(--txt-mid);line-height:1.6;">
+            Dán URL Facebook Page, profile, tab Reels hoặc Videos vào <b style="color:var(--accent)">ô URL trên header</b> rồi nhấn <b style="color:var(--accent)">🔍 Quét</b>. App sẽ tự cuộn trang và đưa link tìm được vào danh sách tải hàng loạt.
+          </p>
+          <div class="facebook-scan-bar">
+            <span id="facebookScanState">Sẵn sàng</span>
+            <span>Link: <b id="facebookScanFound">0</b></span>
+            <span>Lượt quét: <b id="facebookScanDom">0</b></span>
+            <span>Thời gian: <b id="facebookScanElapsed">0s</b></span>
+            <button class="btn btn-danger btn-xs" id="facebookScanCancelBtn" disabled>Dừng quét</button>
+          </div>
+        </div>
+
+        <!-- Chế độ: Dán nhiều link -->
+        <div id="srcPanelLinks" style="display:none;">
+          <textarea id="batchLinksInput" class="field"
+            style="height:110px;resize:vertical;font-family:'Cascadia Code','Consolas',monospace;font-size:11.5px;line-height:1.7;"
+            placeholder="Dán mỗi URL một dòng:&#10;https://www.youtube.com/watch?v=...&#10;https://www.youtube.com/watch?v=...&#10;https://www.tiktok.com/@user/video/..."></textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+            <span id="linkCount" style="font-size:11px;color:var(--txt-lo);">0 URL</span>
+            <button class="btn btn-primary btn-sm" id="loadLinksBtn">✅ Xác nhận danh sách</button>
+          </div>
+        </div>
+
+        <!-- Chế độ: Nhập file .txt -->
+        <div id="srcPanelFile" style="display:none;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="file" id="batchFileInput" accept=".txt,.csv"
+              style="display:none;" />
+            <button class="btn btn-ghost btn-sm" id="batchFilePickerBtn">
+              📂 Chọn file .txt
+            </button>
+            <span id="fileLoadedName" style="font-size:11.5px;color:var(--txt-mid);">Chưa chọn file</span>
+          </div>
+          <p style="font-size:11px;color:var(--txt-lo);margin-top:8px;line-height:1.6;">
+            File .txt: mỗi dòng 1 URL. Hỗ trợ YouTube, TikTok, Instagram, Facebook…
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚙️ Tùy chọn tải hàng loạt</div>
+
+        <!-- Thư mục lưu -->
+        <div class="field-wrap" style="margin-bottom:10px;">
+          <label class="field-label">📁 Thư mục lưu</label>
+          <div class="folder-row" style="gap:6px;">
+            <input class="field" id="batchFolderInput" type="text"
+              placeholder="Chọn thư mục lưu…" readonly style="flex:1;" />
+            <button class="btn btn-ghost btn-sm" id="selectBatchFolderBtn">Chọn</button>
+          </div>
+        </div>
+
+        <div class="batch-opts">
+          <div class="field-wrap">
+            <label class="field-label">Số lượng</label>
+            <input class="field" id="maxVideos" type="number" min="1" max="1000" value="10" />
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Định dạng</label>
+            <select class="field" id="batchFormat">
+              <option value="mp4">MP4</option>
+              <option value="mp3">MP3</option>
+            </select>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Chất lượng</label>
+            <select class="field" id="batchQuality">
+              <option value="1080p" selected>1080p</option>
+              <option value="720p">720p</option>
+              <option value="4k">4K</option>
+              <option value="480p">480p</option>
+              <option value="360p">360p</option>
+              <option value="best">Cao nhất</option>
+            </select>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Kèm phụ đề</label>
+            <select class="field" id="batchSubs">
+              <option value="no">Không</option>
+              <option value="yes">Có</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📡 Trung tâm tải xuống</div>
+        <div class="dc-summary">
+          <span class="dc-chip active">Đang tải: <b id="dcActiveCount">0</b></span>
+          <span class="dc-chip queued">Chờ: <b id="dcQueuedCount">0</b></span>
+          <span class="dc-chip failed">Lỗi: <b id="dcFailedCount">0</b></span>
+          <span class="dc-chip completed">Xong: <b id="dcCompletedCount">0</b></span>
+          <button class="btn btn-ghost btn-xs" id="openDownloadCenterBtn">Chi tiết</button>
+          <button class="btn btn-ghost btn-xs" id="refreshDownloadCenterBtn">Làm mới</button>
+        </div>
+      </div>
+
+      <!-- Danh sách video (ẩn cho tới khi quét/nạp xong) -->
+      <div id="videoListSection" style="display:none;">
+        <div class="select-bar">
+          <div class="select-count">Đã chọn: <b id="selCount">0</b> / <b id="totalCount">0</b></div>
+          <div style="display:flex;gap:5px;">
+            <button class="btn btn-ghost btn-xs" id="batchSelectAllBtn">Chọn tất cả</button>
+            <button class="btn btn-ghost btn-xs" id="batchDeselectAllBtn">Bỏ chọn</button>
+            <button class="btn btn-primary btn-xs" id="downloadBatchBtn" disabled>
+              ⬇ Tải <span id="selCountBtn">0</span> video
+            </button>
+            <button class="btn btn-danger btn-xs" id="cancelBatchBtn" style="display:none;">⏹ Dừng</button>
+          </div>
+        </div>
+
+        <!-- Batch progress -->
+        <div class="progress-wrap" id="batchProgress" style="margin:8px 0 10px;">
+          <div class="progress-head">
+            <span class="progress-label" id="batchProgressLabel">Đang tải…</span>
+            <span class="progress-pct" id="batchProgressText">0/0</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="batchProgressFill"></div>
+          </div>
+        </div>
+
+        <div class="video-list" id="videoGrid"></div>
+      </div>
+
+    </div><!-- /tab-batch -->
+
+
+    <!-- ════════════════════════════════════════════════
+         TAB: LỊCH SỬ
+    ════════════════════════════════════════════════ -->
+    <div class="tab-panel" id="tab-history">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12.5px;font-weight:600;color:var(--txt-mid);">
+          <span id="historyTotal">0</span> mục trong lịch sử
+        </span>
+        <button class="btn btn-danger btn-xs" id="clearHistoryBtn">🗑️ Xóa tất cả</button>
+      </div>
+      <div id="historyList">
+        <div class="empty">
+          <div class="empty-icon">📭</div>
+          <p>Chưa có lịch sử tải xuống</p>
+        </div>
+      </div>
+    </div>
+
+  </main><!-- /content -->
+</div><!-- /shell -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SETTINGS MODAL
+══════════════════════════════════════════════════════════ -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-icon">⚙️</div>
+      <div>
+        <div class="modal-title">Cài đặt</div>
+        <div class="modal-sub">Hàng đợi, cookies cho mạng xã hội và tiện ích hệ thống</div>
+      </div>
+      <button class="modal-close" id="settingsCloseBtn">✕</button>
+    </div>
+
+    <div class="settings-stack">
+      <div class="ver-box">
+        <div class="field-wrap">
+          <label class="field-label" for="parallelDownloads">Luồng tải liên tục</label>
+          <div class="settings-row">
+            <div style="flex:1;min-width:0;">
+              <select class="field" id="parallelDownloads">
+                <option value="1">1 luồng (tuần tự)</option>
+                <option value="2">2 luồng</option>
+                <option value="3">3 luồng</option>
+                <option value="4">4 luồng</option>
+                <option value="5">5 luồng</option>
+                <option value="6">6 luồng</option>
+              </select>
+            </div>
+          </div>
+          <p class="settings-note" id="parallelDownloadsNote">
+            Tăng số luồng để tải liên tục nhiều job cùng lúc. Khuyên dùng 2-3 luồng để ổn định hơn.
+          </p>
+        </div>
+      </div>
+
+      <div class="ver-box">
+        <div class="field-wrap">
+          <label class="field-label" for="profileSelect">Mẫu cấu hình tải</label>
+          <select class="field" id="profileSelect">
+            <option value="">Đang tải mẫu cấu hình…</option>
+          </select>
+          <p class="settings-note" id="profileDescription">
+            Chọn preset để áp nhanh cấu hình cho Video đơn hoặc Hàng loạt.
+          </p>
+          <div class="settings-row">
+            <div class="dc-toolbar">
+              <button class="btn btn-ghost btn-sm" id="applySingleProfileBtn">Áp cho Video đơn</button>
+              <button class="btn btn-ghost btn-sm" id="applyBatchProfileBtn">Áp cho Hàng loạt</button>
+              <button class="btn btn-primary btn-sm" id="applyAllProfileBtn">Áp cả hai</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="dc-toolbar">
+          <button class="btn btn-ghost btn-sm" id="saveCurrentProfileBtn">Lưu mẫu hiện tại</button>
+          <button class="btn btn-ghost btn-sm" id="deleteProfileBtn">Xóa mẫu tùy chỉnh</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ver-box">
+        <div class="field-wrap">
+          <label class="field-label" for="socialCookiePath">Cookies.txt cho mạng xã hội</label>
+          <div class="folder-row">
+            <input class="field" id="socialCookiePath" type="text" placeholder="Chưa chọn cookies.txt dùng cho Instagram / Facebook…" readonly />
+            <button class="btn btn-ghost btn-sm" id="selectCookieFileBtn">Chọn file</button>
+            <button class="btn btn-ghost btn-sm" id="clearCookieFileBtn">Xóa</button>
+          </div>
+          <p class="settings-note">
+            Tùy chọn này dùng cho Instagram và Facebook khi nội dung cần đăng nhập. TikTok vẫn ưu tiên đường tải không cần cookies trước.
+          </p>
+        </div>
+      </div>
+
+      <div class="ver-box">
+        <div class="settings-row">
+          <div>
+          <div class="field-label">Bộ máy yt-dlp</div>
+          <div class="settings-note">Kiểm tra phiên bản hoặc cập nhật bộ máy tải video khi cần.</div>
+            <div class="settings-note" id="persistenceStatusText">Persistence: đang kiểm tra…</div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="openUpdateBtn">Kiểm tra yt-dlp</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" id="settingsDoneBtn">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     LICENSE MODAL
+══════════════════════════════════════════════════════════ -->
+<div class="overlay" id="licenseOverlay">
+  <div class="modal modal-license">
+    <div class="modal-head">
+      <div class="modal-icon">🛡️</div>
+      <div>
+        <div class="modal-title">Thông tin bản quyền</div>
+        <div class="modal-sub">Gửi mã máy cho bên cấp bản quyền rồi dán khóa vào đây để kích hoạt ngoại tuyến</div>
+      </div>
+      <button class="modal-close" id="licenseCloseBtn">✕</button>
+    </div>
+
+    <div class="license-panel">
+      <div class="license-customer-card" id="licenseCustomerCard">
+        <div class="license-customer-name" id="licenseCustomerName">Chưa kích hoạt</div>
+        <div class="license-customer-email" id="licenseCustomerEmail">Gửi mã máy hiện tại để được cấp license đúng cho thiết bị này.</div>
+      </div>
+
+      <div class="field-wrap">
+        <label class="field-label" for="machineIdInput">Mã máy</label>
+        <div class="folder-row">
+          <input class="field" id="machineIdInput" type="text" placeholder="Đang tạo mã máy…" readonly />
+          <button class="btn btn-ghost btn-sm" id="copyMachineIdBtn">Sao chép</button>
+        </div>
+      </div>
+
+      <div class="license-summary-grid">
+        <div class="license-stat-box">
+          <div class="field-label">Trạng thái</div>
+          <div class="license-stat-value" id="licenseStatusValue">Chưa kích hoạt</div>
+        </div>
+        <div class="license-stat-box">
+          <div class="field-label">Hết hạn</div>
+          <div class="license-stat-value" id="licenseExpiryValue">Chưa kích hoạt</div>
+        </div>
+      </div>
+
+      <div class="field-wrap">
+        <label class="field-label" for="licenseKeyInput">Khóa bản quyền</label>
+        <textarea id="licenseKeyInput" class="field"
+          style="height:116px;resize:vertical;font-family:'Cascadia Code','Consolas',monospace;font-size:11.5px;line-height:1.6;"
+          placeholder="Dán khóa bản quyền được cấp cho đúng mã máy này vào đây..."></textarea>
+        <p class="settings-note" id="machineIdHelpText">
+          Khóa bản quyền được ký sẵn cho đúng mã máy, không dùng chung được cho máy khác.
+        </p>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="justify-content:space-between;">
+      <div class="dc-toolbar">
+        <button class="btn btn-ghost btn-sm" id="refreshLicenseBtn">Kiểm tra lại</button>
+        <button class="btn btn-ghost btn-sm" id="clearLicenseBtn">Xóa kích hoạt</button>
+      </div>
+        <button class="btn btn-primary btn-sm" id="activateLicenseBtn">Cập nhật bản quyền</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     DOWNLOAD CENTER MODAL
+══════════════════════════════════════════════════════════ -->
+<div class="overlay" id="downloadCenterOverlay">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <div class="modal-icon">📡</div>
+      <div>
+        <div class="modal-title">Trung tâm tải xuống</div>
+        <div class="modal-sub" id="dcModalSub">Theo dõi tác vụ tải và thao tác khi cần</div>
+      </div>
+      <button class="modal-close" id="downloadCenterCloseBtn">✕</button>
+    </div>
+
+    <div class="dc-summary" id="downloadCenterModalSummary">
+      <span class="dc-chip active">Đang tải: <b id="dcModalActiveCount">0</b></span>
+      <span class="dc-chip queued">Chờ: <b id="dcModalQueuedCount">0</b></span>
+      <span class="dc-chip failed">Lỗi: <b id="dcModalFailedCount">0</b></span>
+      <span class="dc-chip completed">Xong: <b id="dcModalCompletedCount">0</b></span>
+    </div>
+
+    <div class="modal-footer" style="justify-content:space-between;">
+      <div class="dc-toolbar">
+        <button class="btn btn-ghost btn-xs" id="dcRefreshBtn">Làm mới</button>
+        <button class="btn btn-ghost btn-xs" id="dcClearCompletedBtn">Xóa đã xong</button>
+        <button class="btn btn-ghost btn-xs" id="dcClearFailedBtn">Xóa lỗi</button>
+      </div>
+      <button class="btn btn-ghost btn-xs" id="dcCloseBtn">Đóng</button>
+    </div>
+
+    <div class="dc-detail-list" id="downloadCenterDetailList">
+      <div class="empty">
+        <div class="empty-icon">🧭</div>
+        <p>Chưa có tác vụ nào trong trung tâm tải xuống</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     UPDATE MODAL
+══════════════════════════════════════════════════════════ -->
+<div class="overlay" id="updateOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-icon">⬆️</div>
+      <div>
+        <div class="modal-title" id="updateTitle">Kiểm tra cập nhật</div>
+        <div class="modal-sub" id="updateSub">Bộ máy yt-dlp</div>
+      </div>
+      <button class="modal-close" id="updateCloseBtn">✕</button>
+    </div>
+
+    <div class="ver-box">
+      <div class="ver-row">
+        <span class="ver-label">Hiện tại</span>
+        <span class="ver-val" id="localVerEl">—</span>
+      </div>
+      <div class="ver-divider"></div>
+      <div class="ver-row">
+        <span class="ver-label">Mới nhất</span>
+        <span class="ver-val new" id="latestVerEl">—</span>
+      </div>
+    </div>
+
+    <!-- Update progress -->
+    <div class="progress-wrap" id="updateProgress">
+      <div class="progress-head">
+        <span class="progress-label">Đang tải yt-dlp mới…</span>
+        <span class="progress-pct" id="updatePct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="updateFill"></div>
+      </div>
+    </div>
+
+    <div class="status" id="updateStatus"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" id="updateSkipBtn">Bỏ qua</button>
+      <button class="btn btn-primary btn-sm" id="updateDoBtn" style="display:none;">
+        ⬇ Cập nhật ngay
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT (loads external enhanced logic)
+══════════════════════════════════════════════════════════ -->
+<!-- Renderer logic is loaded from src/renderer/v6-app.mjs -->
+<!-- ══════════════════════════════════════════════════════════
+     BATCH RESULT MODAL
+══════════════════════════════════════════════════════════ -->
+<div class="overlay" id="resultOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-icon" id="resultIcon">✅</div>
+      <div>
+        <div class="modal-title" id="resultTitle">Tải xong!</div>
+        <div class="modal-sub" id="resultSub">Tải hàng loạt hoàn thành</div>
+      </div>
+      <button class="modal-close" id="resultCloseTopBtn">✕</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="result-grid">
+      <div class="result-stat total">
+        <div class="rs-num" id="rTotal">0</div>
+        <div class="rs-label">Tổng</div>
+      </div>
+      <div class="result-stat ok">
+        <div class="rs-num" id="rOk">0</div>
+        <div class="rs-label">Thành công</div>
+      </div>
+      <div class="result-stat err">
+        <div class="rs-num" id="rFail">0</div>
+        <div class="rs-label">Thất bại</div>
+      </div>
+    </div>
+
+    <!-- Folder path -->
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--r-sm);
+                padding:9px 12px;font-size:11px;font-family:'Cascadia Code','Consolas',monospace;
+                color:var(--txt-mid);word-break:break-all;" id="resultFolder">—</div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" id="resultCloseBtn">Đóng</button>
+      <button class="btn btn-ghost btn-sm" id="resultRetryFailedBtn" style="display:none;">🔁 Tải lại lỗi</button>
+      <button class="btn btn-primary btn-sm" id="resultOpenFolderBtn">📂 Mở thư mục</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./src/renderer/v6-app.mjs"></script>
+
+</body>
+</html>
+
+

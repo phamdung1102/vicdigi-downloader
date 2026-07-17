@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+  <title>VICdigi - Quản lý bản quyền</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <div class="hero-badge">QUẢN LÝ BẢN QUYỀN</div>
+      <h1>Tạo khóa bản quyền theo đúng mã máy</h1>
+      <p>Nhập mã máy khách gửi, chọn thời hạn, rồi sao chép hoặc lưu tệp khóa ngay trong một màn hình.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Thông tin khách hàng</h2>
+      <p class="helper">Khách cần mở app Downloader, sao chép mã máy rồi gửi cho bạn. Bạn dán mã đó vào đây để tạo khóa đúng thiết bị.</p>
+      <label class="field-group">
+        <span>Mã máy</span>
+        <input id="machineIdInput" type="text" placeholder="VIC-XXXX-XXXX-XXXX-XXXX">
+      </label>
+      <label class="field-group">
+        <span>Tên khách</span>
+        <input id="customerNameInput" type="text" placeholder="Ví dụ: Nguyễn Văn A">
+      </label>
+      <label class="field-group">
+        <span>Email</span>
+        <input id="emailInput" type="email" placeholder="abc@gmail.com">
+      </label>
+    </section>
+
+    <section class="panel">
+      <h2>Thời hạn sử dụng</h2>
+      <label class="field-group">
+        <span>Chế độ hết hạn</span>
+        <select id="durationModeInput">
+          <option value="days">Theo số ngày</option>
+          <option value="lifetime">Không giới hạn</option>
+        </select>
+      </label>
+      <label class="field-group" id="daysGroup">
+        <span>Số ngày</span>
+        <input id="daysInput" type="number" min="1" step="1" value="365">
+      </label>
+      <div class="quick-days">
+        <button class="chip-btn" data-days="30">30 ngày</button>
+        <button class="chip-btn" data-days="90">90 ngày</button>
+        <button class="chip-btn" data-days="365">1 năm</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Khóa bản quyền</h2>
+      <p class="helper">Công cụ sẽ tạo khóa đúng theo mã máy và thông tin khách bạn nhập. Khóa ký được nạp tự động từ bản cài đặt.</p>
+      <button id="generateBtn" class="primary-btn" type="button">Tạo khóa</button>
+      <div class="result-card">
+        <div class="result-meta">
+          <div>
+            <span class="meta-label">Khách hàng</span>
+            <strong id="resultCustomer">--</strong>
+          </div>
+          <div>
+            <span class="meta-label">Thời hạn</span>
+            <strong id="resultExpiry">--</strong>
+          </div>
+        </div>
+        <textarea id="licenseOutput" readonly placeholder="Khóa bản quyền sẽ xuất hiện ở đây..."></textarea>
+        <div class="actions">
+          <button id="copyBtn" type="button">Sao chép khóa</button>
+          <button id="saveBtn" type="button">Lưu tệp khóa</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="statusBar" class="status">Sẵn sàng tạo khóa bản quyền.</div>
+  </main>
+
+  <script type="module" src="./renderer.js"></script>
+</body>
+</html>

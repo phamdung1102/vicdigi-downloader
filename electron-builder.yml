@@ -1,0 +1,87 @@
+appId: com.vicdigi.downloader
+productName: VICdigi Downloader
+copyright: Copyright © 2024-2025 AndrewPham
+
+directories:
+  output: dist
+
+# ── Auto-update qua GitHub Releases ──────────────────────────
+# ⚠️ SỬA owner thành username GitHub của bạn trước khi build.
+# electron-builder sẽ ghi thông tin này vào app-update.yml trong app,
+# electron-updater dùng nó để check bản mới tại:
+#   https://github.com/<owner>/<repo>/releases
+publish:
+  provider: github
+  owner: YOUR-GITHUB-USERNAME
+  repo: vicdigi-downloader
+
+# Files đưa vào app.asar
+files:
+  - main.js
+  - preload.js
+  - index-v6.html
+  - subtitle-converter.js
+  - download-manager.js
+  - package.json
+  - config/license-public.pem
+  - src/**/*
+  - node_modules/**/*
+  - assets/**/*
+  - "!node_modules/**/*.md"
+  - "!node_modules/**/*.map"
+  - "!node_modules/**/test*"
+  - "!node_modules/**/tests*"
+  - "!node_modules/**/*.ts"
+  - "!*.py"
+  - "!*.ps1"
+  - "!*.bat"
+  - "!*.conf"
+  - "!.local/**"
+
+# yt-dlp.exe & ffmpeg.exe ngoài asar -> resources/
+extraResources:
+  - from: "yt-dlp.exe"
+    to: "yt-dlp.exe"
+  - from: "ffmpeg.exe"
+    to: "ffmpeg.exe"
+  - from: "yt-dlp.conf"
+    to: "yt-dlp.conf"
+  - from: "yt-dlp-4k.conf"
+    to: "yt-dlp-4k.conf"
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+
+compression: normal
+removePackageScripts: true
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  icon: assets/icon.ico
+  publisherName: "VICdigi"
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: VICdigi Downloader v8.0
+  license: LICENSE.md
+  deleteAppDataOnUninstall: false
+  menuCategory: true
+  artifactName: "${productName}-v${version}-Setup.exe"
+
+portable:
+  artifactName: "${productName}-v${version}-Portable.exe"
