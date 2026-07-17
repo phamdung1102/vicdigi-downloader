@@ -37,6 +37,7 @@ process.on('unhandledRejection', (reason) => {
 
 // ── Create BrowserWindow ──────────────────────────────────────
 let mainWindow;
+let _dlManagerRef = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -51,7 +52,7 @@ function createWindow() {
     icon:            path.join(__dirname, 'assets', 'icon.png'),
     titleBarStyle:   'default',
     show:            false,
-    title:           'VICdigi Downloader v8.0',
+    title:           `VICdigi Downloader v${app.getVersion()}`,
     autoHideMenuBar: true,
   });
 
@@ -93,6 +94,7 @@ app.whenReady().then(async () => {
     rootDir: __dirname,
     dbPath: path.join(app.getPath('userData'), 'vicdigi-v7.db'),
   });
+  _dlManagerRef = dlManager;
   const capsDummy = { ytdlp: false, ffmpeg: false, workingMode: 'demo' };
   registerAll(null, capsDummy, appDir(), store, dlManager);
 
@@ -109,7 +111,7 @@ app.whenReady().then(async () => {
   // 4. Cập nhật caps vào handlers ngay
   updateCaps(capabilities);
 
-  mainWindow.setTitle('VICdigi Downloader v8.0');
+  mainWindow.setTitle(`VICdigi Downloader v${app.getVersion()}`);
 
   // 4b. Auto-update qua GitHub Releases (chỉ chạy với bản packaged)
   if (!IS_SMOKE_RENDERER) setupAutoUpdater(mainWindow);
@@ -145,6 +147,11 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// Dừng yt-dlp/torrent đang chạy + chốt snapshot trước khi thoát
+app.on('before-quit', () => {
+  try { _dlManagerRef?.shutdown?.(); } catch (_) {}
 });
 
 // ── Forward Download Manager events to renderer ───────────────

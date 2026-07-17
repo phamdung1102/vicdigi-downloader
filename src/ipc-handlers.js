@@ -55,10 +55,13 @@ function registerAll(mainWindow, caps, appDir, store, dlManager) {
   _registerFacebookScanner();
   _registerUpdater();
 
-  // Heartbeat theo dõi sử dụng (tối đa 1 lần/ngày, chỉ khi license active)
-  setTimeout(() => {
+  // Heartbeat theo dõi sử dụng (tối đa 1 lần/ngày, chỉ khi license active).
+  // Lặp lại mỗi 6 giờ để máy treo app nhiều ngày vẫn báo đủ từng ngày.
+  const sendHeartbeat = () => {
     try { trackDailyHeartbeat(_licenseSvc.getStatusCached(), _store); } catch (_) {}
-  }, 5000);
+  };
+  setTimeout(sendHeartbeat, 5000);
+  setInterval(sendHeartbeat, 6 * 60 * 60 * 1000);
 }
 
 // ── LICENSE GATE (tầng main process) ─────────────────────────
@@ -83,7 +86,9 @@ function _registerVideo() {
 
   ipcMain.handle('get-video-info-multi', async (_e, url) => {
     _requireLicense();
-    return getVideoInfoMulti(url.trim(), _caps, _appDir);
+    const cleanUrl = String(url || '').trim();
+    if (!cleanUrl || !/^https?:\/\//i.test(cleanUrl)) throw new Error('URL không hợp lệ.');
+    return getVideoInfoMulti(cleanUrl, _caps, _appDir);
   });
 
   ipcMain.handle('download-video', async (event, opts) => {
@@ -204,10 +209,13 @@ function _registerSystem() {
     success: true,
     session: _dlManager?.getRecoverableSessionInfo?.() || { hasRecoverable: false, queued: 0, paused: 0, total: 0, updatedAt: null },
   }));
-  ipcMain.handle('resume-pending-session', () => ({
-    success: true,
-    session: _dlManager?.resumePendingSession?.() || null,
-  }));
+  ipcMain.handle('resume-pending-session', () => {
+    _requireLicense();
+    return {
+      success: true,
+      session: _dlManager?.resumePendingSession?.() || null,
+    };
+  });
   ipcMain.handle('discard-pending-session', () => ({
     success: true,
     session: _dlManager?.discardPendingSession?.() || null,
@@ -255,8 +263,8 @@ function _registerDownloadManager() {
   });
 
   ipcMain.handle('pause-download',    async (_e, id) => ({ success: await (_dlManager?.pauseDownload(id) ?? false) }));
-  ipcMain.handle('resume-download',   (_e, id) => ({ success: _dlManager?.resumeDownload(id)   ?? false }));
-  ipcMain.handle('retry-download',    (_e, id) => ({ success: _dlManager?.retryDownload(id)    ?? false }));
+  ipcMain.handle('resume-download',   (_e, id) => { _requireLicense(); return { success: _dlManager?.resumeDownload(id) ?? false }; });
+  ipcMain.handle('retry-download',    (_e, id) => { _requireLicense(); return { success: _dlManager?.retryDownload(id)  ?? false }; });
   ipcMain.handle('cancel-download',   async (_e, id) => ({ success: await (_dlManager?.cancelDownload(id) ?? false) }));
   ipcMain.handle('get-download-status',(_e,id) => ({ success: true, status: _dlManager?.getDownloadStatus(id) ?? null }));
   ipcMain.handle('get-all-downloads',  ()      => ({ success: true, downloads: _dlManager?.getAllDownloads() ?? {} }));

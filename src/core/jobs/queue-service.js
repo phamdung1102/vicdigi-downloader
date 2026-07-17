@@ -710,6 +710,24 @@ class QueueService extends EventBus {
     return this.getRecoverableSessionInfo();
   }
 
+  // Gọi khi app thoát: dừng mọi tiến trình con để không bỏ lại
+  // yt-dlp/torrent chạy mồ côi, và chốt snapshot cuối cùng ngay lập tức.
+  shutdown() {
+    if (this._persistTimer) {
+      clearTimeout(this._persistTimer);
+      this._persistTimer = null;
+    }
+    this.activeProcesses.forEach(process => {
+      try { process.kill('SIGTERM'); } catch (_) {}
+    });
+    this.activeProcesses.clear();
+    this.activeTorrentSessions.forEach(session => {
+      try { session.close({ destroyStore: false }).catch(() => {}); } catch (_) {}
+    });
+    this.activeTorrentSessions.clear();
+    try { this.persistSnapshot(); } catch (_) {}
+  }
+
   setMaxParallelDownloads(max) {
     this.maxParallelDownloads = Math.max(1, Math.min(10, max));
     this.persistSnapshot();
