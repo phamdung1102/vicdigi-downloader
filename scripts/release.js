@@ -20,9 +20,12 @@ if (!token) {
 
 console.log(`🚀 Build & publish v${pkg.version} lên GitHub Releases...`);
 
+// Chỉ build + đăng target NSIS (Setup) — KHÔNG đăng bản Portable lên GitHub.
+// Setup.exe bắt buộc phải có trên release vì nó chính là file mà
+// electron-updater tải về để update; latest.yml chỉ là metadata trỏ tới nó.
 const result = spawnSync(
   'npx',
-  ['electron-builder', '--win', '--config', 'electron-builder.yml', '--publish', 'always'],
+  ['electron-builder', '--win', 'nsis', '--config', 'electron-builder.yml', '--publish', 'always'],
   {
     stdio: 'inherit',
     shell: process.platform === 'win32',
