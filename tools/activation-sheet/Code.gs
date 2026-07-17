@@ -160,7 +160,7 @@ function base64UrlEncode_(bytes) {
 
 // Mở URL web app bằng trình duyệt để kiểm tra nhanh còn sống không
 function doGet() {
-  return ContentService.createTextOutput('VICdigi activation tracker OK');
+  return ContentService.createTextOutput('VICdigi activation tracker OK v3-pemfix');
 }
 
 function getSheet(ss, name, headers) {
