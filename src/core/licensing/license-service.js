@@ -14,6 +14,24 @@ const PLACEHOLDER_MARKER = 'REPLACE_WITH_YOUR_BASE64_PUBLIC_KEY';
 class LicenseService {
   constructor(store) {
     this.store = store || null;
+    this._machineId = null;
+    this._statusCache = null;
+    this._statusCacheAt = 0;
+  }
+
+  // Bản cache của getStatus() cho các check lặp lại (mỗi IPC request).
+  // TTL ngắn để license hết hạn/bị gỡ vẫn được phát hiện nhanh.
+  getStatusCached(ttlMs = 30000) {
+    const now = Date.now();
+    if (this._statusCache && now - this._statusCacheAt < ttlMs) return this._statusCache;
+    this._statusCache = this.getStatus();
+    this._statusCacheAt = now;
+    return this._statusCache;
+  }
+
+  _invalidateStatusCache() {
+    this._statusCache = null;
+    this._statusCacheAt = 0;
   }
 
   getStatus() {
@@ -73,11 +91,13 @@ class LicenseService {
       activatedAt: new Date().toISOString(),
     });
 
+    this._invalidateStatusCache();
     return this.getStatus();
   }
 
   clear() {
     this.store?.delete?.(LICENSE_STORE_KEY);
+    this._invalidateStatusCache();
     return this.getStatus();
   }
 
@@ -162,6 +182,7 @@ class LicenseService {
   }
 
   getMachineId() {
+    if (this._machineId) return this._machineId;
     const rawMachineId = [
       readWindowsMachineGuid(),
       os.hostname(),
@@ -171,7 +192,8 @@ class LicenseService {
 
     const digest = crypto.createHash('sha256').update(rawMachineId || 'vicdigi-fallback').digest('hex').toUpperCase();
     const groups = digest.slice(0, 16).match(/.{1,4}/g) || ['0000', '0000', '0000', '0000'];
-    return `VIC-${groups.join('-')}`;
+    this._machineId = `VIC-${groups.join('-')}`;
+    return this._machineId;
   }
 
   getPublicKey() {

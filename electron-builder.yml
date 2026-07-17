@@ -27,6 +27,7 @@ files:
   - download-manager.js
   - package.json
   - config/license-public.pem
+  - config/telemetry.json
   - src/**/*
   - node_modules/**/*
   - assets/**/*

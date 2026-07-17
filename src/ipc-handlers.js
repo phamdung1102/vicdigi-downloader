@@ -17,6 +17,7 @@ const {
   saveCustomProfile,
 } = require('./core/profiles/profile-service');
 const { LicenseService } = require('./core/licensing/license-service');
+const { trackActivation, trackDailyHeartbeat } = require('./core/licensing/activation-tracker');
 const { checkUpdate, downloadUpdate } = require('./ytdlp-updater');
 const { recordYtDlpError } = require('./diagnostics');
 const DownloadManager = require('../download-manager');
@@ -53,22 +54,40 @@ function registerAll(mainWindow, caps, appDir, store, dlManager) {
   _registerBatch();
   _registerFacebookScanner();
   _registerUpdater();
+
+  // Heartbeat theo dõi sử dụng (tối đa 1 lần/ngày, chỉ khi license active)
+  setTimeout(() => {
+    try { trackDailyHeartbeat(_licenseSvc.getStatusCached(), _store); } catch (_) {}
+  }, 5000);
+}
+
+// ── LICENSE GATE (tầng main process) ─────────────────────────
+// Chặn sâu: dù renderer bị can thiệp, các chức năng chính vẫn
+// từ chối chạy khi máy chưa kích hoạt license hợp lệ.
+function _requireLicense() {
+  const status = _licenseSvc?.getStatusCached?.();
+  if (!status?.valid) {
+    throw new Error('Chức năng bị khóa: máy này chưa kích hoạt license hợp lệ.');
+  }
 }
 
 // ── VIDEO INFO ────────────────────────────────────────────────
 
 function _registerVideo() {
   ipcMain.handle('get-video-info', async (_e, url) => {
+    _requireLicense();
     if (!url || !isValidYouTubeUrl(url.trim()))
       throw new Error('URL YouTube không hợp lệ.');
     return getVideoInfo(url.trim(), _caps, _appDir);
   });
 
   ipcMain.handle('get-video-info-multi', async (_e, url) => {
+    _requireLicense();
     return getVideoInfoMulti(url.trim(), _caps, _appDir);
   });
 
   ipcMain.handle('download-video', async (event, opts) => {
+    _requireLicense();
     const { url, outputPath, format, quality, title } = opts;
     if (!url || !outputPath) throw new Error('url và outputPath là bắt buộc');
 
@@ -99,6 +118,7 @@ function _registerVideo() {
 
 function _registerSubtitle() {
   ipcMain.handle('download-subtitle', async (_e, opts) => {
+    _requireLicense();
     const { url, outputPath } = opts;
     if (!url || !outputPath) throw new Error('url và outputPath là bắt buộc');
     return downloadSubtitle(opts, _caps, _appDir);
@@ -109,6 +129,7 @@ function _registerSubtitle() {
 
 function _registerThumbnail() {
   ipcMain.handle('download-thumbnail', async (_e, opts) => {
+    _requireLicense();
     if (!isValidYouTubeUrl(opts.url)) throw new Error('URL YouTube không hợp lệ');
     return downloadThumbnail(opts);
   });
@@ -202,6 +223,7 @@ function _registerSystem() {
   }));
   ipcMain.handle('activate-license', (_e, licenseKey) => {
     const licenseStatus = _licenseSvc?.activate?.(licenseKey) || null;
+    if (licenseStatus?.valid) trackActivation(licenseStatus);
     return {
       success: !!licenseStatus?.valid,
       licenseStatus,
@@ -226,6 +248,7 @@ function _registerStore() {
 
 function _registerDownloadManager() {
   ipcMain.handle('add-to-queue', (_e, info) => {
+    _requireLicense();
     if (!_dlManager) throw new Error('Download Manager not ready');
     if (!info.platform) info.platform = DownloadManager.detectPlatform(info.url);
     return { success: true, downloadId: _dlManager.addToQueue(info) };
@@ -247,6 +270,7 @@ function _registerDownloadManager() {
 function _registerBatch() {
 
   ipcMain.handle('scan-channel-videos', async (_e, opts) => {
+    _requireLicense();
     const { url, maxVideos = 10 } = opts;
     const result = await scanChannelVideos({
       url,
@@ -277,6 +301,7 @@ function _stopActiveFacebookScan(reason = 'replaced') {
 
 function _registerFacebookScanner() {
   ipcMain.handle('scan-facebook-page', async (_event, payload = {}) => {
+    _requireLicense();
     _stopActiveFacebookScan('replaced');
 
     try {
