@@ -159,6 +159,8 @@ const VIC = (() => {
     on('saveCurrentProfileBtn', 'click', saveCurrentProfile);
     on('deleteProfileBtn', 'click', deleteSelectedProfile);
     on('activateLicenseBtn', 'click', activateLicense);
+    on('activateOnlineBtn', 'click', activateLicenseOnline);
+    on('activationCodeInput', 'keydown', event => { if (event.key === 'Enter') activateLicenseOnline(); });
     on('refreshLicenseBtn', 'click', () => refreshLicenseStatus({ notify: true }));
     on('clearLicenseBtn', 'click', clearLicense);
     on('copyMachineIdBtn', 'click', copyMachineId);
@@ -628,6 +630,27 @@ const VIC = (() => {
     if (!response?.success) return showStatus(response?.error || licenseStatus?.message || TEXT.license.invalid('Khong kich hoat duoc'), 'warn');
     setValue('licenseKeyInput', '');
     showStatus(TEXT.license.activated, 'ok');
+  }
+
+  async function activateLicenseOnline() {
+    const code = $('activationCodeInput')?.value?.trim() || '';
+    if (!code) return showStatus(TEXT.license.emptyCode, 'warn');
+
+    const btn = $('activateOnlineBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Đang kích hoạt…'; }
+    showStatus(TEXT.license.activating, 'info');
+    try {
+      const response = await api?.activateLicenseOnline?.(code);
+      licenseStatus = response?.licenseStatus || null;
+      renderLicenseStatus();
+      if (!response?.success) {
+        return showStatus(response?.error || TEXT.license.invalid('Kich hoat online that bai'), 'warn');
+      }
+      setValue('activationCodeInput', '');
+      showStatus(TEXT.license.activated, 'ok');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Kích hoạt'; }
+    }
   }
 
   async function clearLicense() {

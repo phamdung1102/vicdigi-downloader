@@ -558,14 +558,26 @@
       </div>
 
       <div class="field-wrap">
-        <label class="field-label" for="licenseKeyInput">Khóa bản quyền</label>
+        <label class="field-label" for="activationCodeInput">Kích hoạt online (khuyên dùng)</label>
+        <div class="folder-row">
+          <input class="field" id="activationCodeInput" type="text"
+            placeholder="Nhập mã kích hoạt được cấp, ví dụ: KH-ABC-365" autocomplete="off" />
+          <button class="btn btn-primary btn-sm" id="activateOnlineBtn">Kích hoạt</button>
+        </div>
+        <p class="settings-note">
+          Nhập mã và bấm Kích hoạt — máy tự nhận bản quyền qua mạng, không cần gửi mã máy đi.
+        </p>
+      </div>
+
+      <details class="field-wrap" id="manualLicenseDetails">
+        <summary class="field-label" style="cursor:pointer;">Hoặc dán khóa bản quyền thủ công</summary>
         <textarea id="licenseKeyInput" class="field"
-          style="height:116px;resize:vertical;font-family:'Cascadia Code','Consolas',monospace;font-size:11.5px;line-height:1.6;"
+          style="height:116px;resize:vertical;font-family:'Cascadia Code','Consolas',monospace;font-size:11.5px;line-height:1.6;margin-top:8px;"
           placeholder="Dán khóa bản quyền được cấp cho đúng mã máy này vào đây..."></textarea>
         <p class="settings-note" id="machineIdHelpText">
           Khóa bản quyền được ký sẵn cho đúng mã máy, không dùng chung được cho máy khác.
         </p>
-      </div>
+      </details>
     </div>
 
     <div class="modal-footer" style="justify-content:space-between;">

@@ -17,7 +17,7 @@ const {
   saveCustomProfile,
 } = require('./core/profiles/profile-service');
 const { LicenseService } = require('./core/licensing/license-service');
-const { trackActivation, trackDailyHeartbeat } = require('./core/licensing/activation-tracker');
+const { trackActivation, trackDailyHeartbeat, requestOnlineLicense } = require('./core/licensing/activation-tracker');
 const { checkUpdate, downloadUpdate } = require('./ytdlp-updater');
 const { recordYtDlpError } = require('./diagnostics');
 const DownloadManager = require('../download-manager');
@@ -236,6 +236,24 @@ function _registerSystem() {
       success: !!licenseStatus?.valid,
       licenseStatus,
       error: licenseStatus?.valid ? null : (licenseStatus?.message || 'Kich hoat that bai'),
+    };
+  });
+
+  // Kích hoạt online: đổi mã kích hoạt lấy license token từ máy chủ,
+  // rồi verify + lưu bằng chính LicenseService (không bỏ qua kiểm chữ ký).
+  ipcMain.handle('activate-license-online', async (_e, activationCode) => {
+    const machineId = _licenseSvc?.getMachineId?.();
+    const issued = await requestOnlineLicense(activationCode, machineId);
+    if (!issued.ok) {
+      return { success: false, licenseStatus: _licenseSvc?.getStatus?.() || null, error: issued.error };
+    }
+
+    const licenseStatus = _licenseSvc?.activate?.(issued.token) || null;
+    if (licenseStatus?.valid) trackActivation(licenseStatus);
+    return {
+      success: !!licenseStatus?.valid,
+      licenseStatus,
+      error: licenseStatus?.valid ? null : (licenseStatus?.message || 'License nhan tu may chu khong hop le'),
     };
   });
   ipcMain.handle('clear-license', () => ({

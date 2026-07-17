@@ -12,6 +12,15 @@
 
 var DEVICE_SHEET = 'Thiết bị';
 var LOG_SHEET = 'Log';
+var CODE_SHEET = 'Cấp phép';
+
+var APP_ID = 'vicdigi-downloader';
+var TOKEN_PREFIX = 'VDL1';
+
+var CODE_HEADERS = [
+  'Mã kích hoạt', 'Số ngày (hoặc lifetime)', 'Tên khách', 'Email',
+  'Trạng thái', 'Machine ID đã dùng', 'Ngày cấp', 'Ghi chú'
+];
 
 var DEVICE_HEADERS = [
   'Machine ID', 'Tên khách', 'Email', 'Gói', 'Trạng thái',
@@ -26,20 +35,112 @@ var LOG_HEADERS = [
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
-    if (!data.machineId) throw new Error('Thiếu machineId');
 
+    // Kích hoạt online: đổi mã lấy license token
+    if (data.action === 'issue') {
+      return jsonOut(handleIssue(data));
+    }
+
+    // Mặc định: ghi nhận sự kiện theo dõi (activate / heartbeat)
+    if (!data.machineId) throw new Error('Thiếu machineId');
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     appendLog(ss, data);
     upsertDevice(ss, data);
-
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonOut({ ok: true });
   } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonOut({ ok: false, error: String(err && err.message || err) });
   }
+}
+
+function jsonOut(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── Phát license online ──────────────────────────────────────
+function handleIssue(data) {
+  var code = String(data.code || '').trim();
+  var machineId = String(data.machineId || '').trim();
+  if (!code) return { ok: false, error: 'Thiếu mã kích hoạt.' };
+  if (!machineId) return { ok: false, error: 'Thiếu mã máy.' };
+
+  var privateKey = PropertiesService.getScriptProperties().getProperty('PRIVATE_KEY');
+  if (!privateKey) return { ok: false, error: 'Máy chủ chưa cấu hình private key.' };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = getSheet(ss, CODE_SHEET, CODE_HEADERS);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { ok: false, error: 'Mã kích hoạt không tồn tại.' };
+
+  var rows = sheet.getRange(2, 1, lastRow - 1, CODE_HEADERS.length).getValues();
+  var rowIndex = -1, row = null;
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === code) { rowIndex = i + 2; row = rows[i]; break; }
+  }
+  if (!row) return { ok: false, error: 'Mã kích hoạt không tồn tại.' };
+
+  var status = String(row[4] || '').trim().toLowerCase();
+  var usedMachine = String(row[5] || '').trim();
+
+  // Đã dùng trên máy khác → từ chối. Cùng máy → cho kích hoạt lại.
+  if (usedMachine && usedMachine !== machineId) {
+    return { ok: false, error: 'Mã này đã được kích hoạt trên máy khác.' };
+  }
+  if (status === 'khóa' || status === 'locked' || status === 'revoked') {
+    return { ok: false, error: 'Mã kích hoạt đã bị khóa.' };
+  }
+
+  var durationRaw = String(row[1] || '').trim().toLowerCase();
+  var isLifetime = (durationRaw === 'lifetime' || durationRaw === 'vĩnh viễn' || durationRaw === '');
+  var days = isLifetime ? null : parseInt(durationRaw, 10);
+  if (!isLifetime && (!isFinite(days) || days <= 0)) {
+    return { ok: false, error: 'Cấu hình số ngày của mã không hợp lệ.' };
+  }
+
+  var now = new Date();
+  var payload = {
+    appId: APP_ID,
+    machineId: machineId,
+    customerName: String(row[2] || '').trim(),
+    email: String(row[3] || '').trim(),
+    issuedAt: now.toISOString(),
+    expiresAt: isLifetime ? null : new Date(now.getTime() + days * 86400000).toISOString(),
+    plan: isLifetime ? 'lifetime' : (days + '-day'),
+    features: ['downloads']
+  };
+
+  var token = signToken(payload, privateKey);
+
+  // Đánh dấu mã đã dùng
+  sheet.getRange(rowIndex, 5).setValue('đã dùng');
+  sheet.getRange(rowIndex, 6).setValue(machineId);
+  sheet.getRange(rowIndex, 7).setValue(now.toISOString());
+
+  // Ghi log + cập nhật thiết bị
+  var trackData = {
+    event: 'activate-online', machineId: machineId,
+    customerName: payload.customerName, email: payload.email,
+    plan: payload.plan, licenseStatus: 'active',
+    issuedAt: payload.issuedAt, expiresAt: payload.expiresAt,
+    appVersion: data.appVersion || '', timestamp: now.toISOString()
+  };
+  appendLog(ss, trackData);
+  upsertDevice(ss, trackData);
+
+  return { ok: true, token: token };
+}
+
+// Ký token đúng định dạng app: VDL1.<payloadBase64url>.<sigBase64url>
+function signToken(payload, privateKey) {
+  var payloadEncoded = base64UrlEncode_(Utilities.newBlob(JSON.stringify(payload)).getBytes());
+  var sigBytes = Utilities.computeRsaSha256Signature(payloadEncoded, privateKey);
+  var sigEncoded = base64UrlEncode_(sigBytes);
+  return TOKEN_PREFIX + '.' + payloadEncoded + '.' + sigEncoded;
+}
+
+function base64UrlEncode_(bytes) {
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, '');
 }
 
 // Mở URL web app bằng trình duyệt để kiểm tra nhanh còn sống không

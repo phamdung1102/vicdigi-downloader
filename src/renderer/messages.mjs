@@ -142,6 +142,8 @@ export const TEXT = {
   },
   license: {
     emptyKey: 'Vui l\\u00f2ng d\\u00e1n kh\\u00f3a b\\u1ea3n quy\\u1ec1n v\\u00e0o \\u00f4 k\\u00edch ho\\u1ea1t',
+    emptyCode: 'Vui l\\u00f2ng nh\\u1eadp m\\u00e3 k\\u00edch ho\\u1ea1t',
+    activating: '\\u0110ang k\\u00edch ho\\u1ea1t online, vui l\\u00f2ng \\u0111\\u1ee3i\\u2026',
     activated: '\\u0110\\u00e3 k\\u00edch ho\\u1ea1t \\u1ee9ng d\\u1ee5ng th\\u00e0nh c\\u00f4ng',
     cleared: '\\u0110\\u00e3 x\\u00f3a th\\u00f4ng tin k\\u00edch ho\\u1ea1t tr\\u00ean m\\u00e1y n\\u00e0y',
     checked: '\\u0110\\u00e3 ki\\u1ec3m tra l\\u1ea1i tr\\u1ea1ng th\\u00e1i b\\u1ea3n quy\\u1ec1n',

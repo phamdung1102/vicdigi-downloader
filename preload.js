@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   detectPlatform: (url) => invoke('detect-platform', url),
   getLicenseStatus: () => invoke('get-license-status'),
   activateLicense: (licenseKey) => invoke('activate-license', licenseKey),
+  activateLicenseOnline: (activationCode) => invoke('activate-license-online', activationCode),
   clearLicense: () => invoke('clear-license'),
 
   // ── Persistent Store (thay thế localStorage) ────────────────────────

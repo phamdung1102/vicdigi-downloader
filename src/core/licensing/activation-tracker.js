@@ -72,6 +72,40 @@ function trackActivation(licenseStatus) {
 }
 
 /**
+ * Kích hoạt online: gửi mã + machineId lên Apps Script, nhận về license token.
+ * Trả { ok, token?, error? }. Không ném lỗi — luôn trả object.
+ */
+async function requestOnlineLicense(code, machineId, appVersion) {
+  const endpoint = getEndpoint();
+  if (!endpoint) return { ok: false, error: 'Kích hoạt online chưa được cấu hình.' };
+
+  const activationCode = String(code || '').trim();
+  if (!activationCode) return { ok: false, error: 'Vui lòng nhập mã kích hoạt.' };
+  if (!machineId) return { ok: false, error: 'Chưa lấy được mã máy.' };
+
+  try {
+    const res = await axios.post(endpoint, {
+      action: 'issue',
+      code: activationCode,
+      machineId,
+      appVersion: appVersion || getAppVersion(),
+      timestamp: new Date().toISOString(),
+    }, {
+      timeout: 15000,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const data = res?.data || {};
+    if (!data.ok) return { ok: false, error: data.error || 'Máy chủ từ chối mã kích hoạt.' };
+    if (!data.token) return { ok: false, error: 'Máy chủ không trả về license.' };
+    return { ok: true, token: String(data.token) };
+  } catch (error) {
+    const serverMsg = error?.response?.data?.error;
+    return { ok: false, error: serverMsg || 'Không kết nối được máy chủ kích hoạt. Kiểm tra mạng.' };
+  }
+}
+
+/**
  * Gọi lúc app khởi động: báo "máy này còn đang dùng".
  * Chỉ gửi khi license active và tối đa 1 lần/ngày (dedupe qua store).
  */
@@ -89,4 +123,4 @@ async function trackDailyHeartbeat(licenseStatus, store) {
   return sent;
 }
 
-module.exports = { trackActivation, trackDailyHeartbeat };
+module.exports = { trackActivation, trackDailyHeartbeat, requestOnlineLicense };
