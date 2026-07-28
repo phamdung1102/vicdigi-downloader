@@ -1,7 +1,7 @@
 export const DEFAULTS = {
   theme: 'dark',
   batchSourceMode: 'channel',
-  maxVideos: 10,
+  maxVideos: 50,
   parallelDownloads: 3,
   batchFormat: 'mp4',
   batchQuality: '1080p',
