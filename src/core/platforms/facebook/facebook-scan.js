@@ -16,8 +16,13 @@ function normalizeScanUrl(rawUrl) {
       : '';
 
     if (profileId) {
-      parsed.pathname = `/${profileId}/reels/`;
+      const requestedTab = String(parsed.searchParams.get('sk') || '').trim();
       parsed.search = '';
+      parsed.searchParams.set('id', profileId);
+      parsed.searchParams.set(
+        'sk',
+        /^(reels?|videos?)(?:_tab)?$/i.test(requestedTab) ? requestedTab : 'reels_tab',
+      );
       return parsed.toString();
     }
 
