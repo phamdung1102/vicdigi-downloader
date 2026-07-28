@@ -706,6 +706,42 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
     }
   }
 
+  async function dismissBlockingLoginDialog() {
+    if (stopped || scanWin.isDestroyed() || webContents.isDestroyed()) return false;
+
+    try {
+      const dismissed = await webContents.executeJavaScript(
+        `(() => {
+          const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'));
+          for (const dialog of dialogs) {
+            const text = String(dialog.textContent || '');
+            if (!/log in|see more on facebook|đăng nhập|xem thêm trên facebook/i.test(text)) continue;
+
+            const buttons = Array.from(dialog.querySelectorAll('button,[role="button"]'));
+            const closeButton = buttons.find(button => {
+              const label = String(button.getAttribute('aria-label') || button.textContent || '').trim();
+              return /^(close|đóng|x)$/i.test(label);
+            });
+            if (!closeButton) continue;
+            closeButton.click();
+            return true;
+          }
+          return false;
+        })();`,
+        true
+      );
+
+      if (dismissed) {
+        sendScannerStatus({ state: 'login-dialog-dismissed' });
+        await new Promise(resolve => setTimeout(resolve, 350));
+      }
+      return Boolean(dismissed);
+    } catch (error) {
+      sendScannerStatus({ state: 'dialog-dismiss-error', error: error.message });
+      return false;
+    }
+  }
+
   async function ensurePaginationQueryId() {
     if (paginationQueryId || stopped || webContents.isDestroyed()) {
       return paginationQueryId;
@@ -858,6 +894,7 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
     }
 
     try {
+      await dismissBlockingLoginDialog();
       await runDomScan();
       await runPaginationFetch();
       if (stopped) {
@@ -869,7 +906,7 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
       webContents.sendInputEvent({ type: 'keyDown', keyCode: 'PageDown' });
       webContents.sendInputEvent({ type: 'keyUp', keyCode: 'PageDown' });
 
-      await webContents.executeJavaScript(
+      const scrollResult = await webContents.executeJavaScript(
         `(() => {
           const beforeY = window.scrollY || document.documentElement.scrollTop || 0;
           const deltas = [
@@ -924,6 +961,7 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
         true
       );
       scrollCount += 1;
+      sendScannerStatus({ state: 'scroll', scroll: scrollResult });
       await new Promise((resolve) => setTimeout(resolve, 420));
       await runDomScan();
       await runPaginationFetch();
