@@ -276,8 +276,6 @@ class QueueService extends EventBus {
         return this.downloadTwitter(download);
       case 'vimeo':
         return this.downloadVimeo(download);
-      case 'hongguo':
-        return this.downloadHongguo(download);
       case 'torrent':
         return this.downloadTorrent(download);
       default:
@@ -396,10 +394,6 @@ class QueueService extends EventBus {
 
   async downloadFacebook(download) {
     return socialDownloads.downloadFacebook(download, this.getSocialContext());
-  }
-
-  async downloadHongguo(download) {
-    return socialDownloads.downloadHongguo(download, this.getSocialContext());
   }
 
   async downloadTwitter(download) {

@@ -12,12 +12,6 @@ function detectPlatform(url = '') {
   if (source.includes('facebook.com') || source.includes('fb.watch')) return 'facebook';
   if (source.includes('twitter.com') || source.includes('x.com')) return 'twitter';
   if (source.includes('vimeo.com')) return 'vimeo';
-  if (
-    source.includes('hongguo') ||
-    source.includes('hongguoduanju.com') ||
-    source.includes('novelquickapp.com') ||
-    /reading\.snssdk\.com\/(?:[^/?#]*\/)*(?:hongguo|drweb)/i.test(source)
-  ) return 'hongguo';
   return 'unknown';
 }
 

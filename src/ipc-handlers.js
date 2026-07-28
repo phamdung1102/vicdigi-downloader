@@ -10,7 +10,6 @@ const { isValidYouTubeUrl } = require('./utils');
 const { getVideoInfo, getVideoInfoMulti } = require('./video-info');
 const { downloadVideo, downloadSubtitle, downloadThumbnail } = require('./downloader');
 const { scanChannelVideos } = require('./core/media/scan-service');
-const { searchSeries: searchHongguoSeries } = require('./core/platforms/hongguo/hongguo-scan');
 const { startDomScanner } = require('./core/facebook/fb-dom-scanner');
 const {
   deleteCustomProfile,
@@ -100,7 +99,7 @@ function _registerVideo() {
     const platform = DownloadManager.detectPlatform(url);
 
     // Social platforms → queue via Download Manager
-    if (['instagram', 'facebook', 'tiktok', 'hongguo', 'torrent'].includes(platform)) {
+    if (['instagram', 'facebook', 'tiktok', 'torrent'].includes(platform)) {
       if (!_dlManager) throw new Error('Download Manager not ready');
       return _runManagedDownload(event, {
         url,
@@ -295,11 +294,6 @@ function _registerDownloadManager() {
 // ── BATCH ────────────────────────────────────────────────────
 
 function _registerBatch() {
-
-  ipcMain.handle('search-hongguo-series', async (_e, payload = {}) => {
-    _requireLicense();
-    return searchHongguoSeries(payload.query, payload.limit);
-  });
 
   ipcMain.handle('scan-channel-videos', async (_e, opts) => {
     _requireLicense();

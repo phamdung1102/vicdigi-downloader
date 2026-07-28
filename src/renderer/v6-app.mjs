@@ -142,15 +142,10 @@ const VIC = (() => {
     on('nav-license', 'click', openLicenseModal);
     on('srcTabChannel', 'click', () => switchBatchSrc('channel'));
     on('srcTabFacebook', 'click', () => switchBatchSrc('facebook'));
-    on('srcTabHongguo', 'click', () => switchBatchSrc('hongguo'));
     on('srcTabLinks', 'click', () => switchBatchSrc('links'));
     on('srcTabFile', 'click', () => switchBatchSrc('file'));
     on('loadLinksBtn', 'click', loadLinksFromTextarea);
     on('facebookScanCancelBtn', 'click', cancelFacebookScan);
-    on('hongguoSearchBtn', 'click', searchHongguoByName);
-    $('hongguoSearchInput')?.addEventListener('keydown', event => {
-      if (event.key === 'Enter') searchHongguoByName();
-    });
     on('batchFilePickerBtn', 'click', () => $('batchFileInput')?.click());
     on('batchSelectAllBtn', 'click', batchSelectAll);
     on('batchDeselectAllBtn', 'click', batchDeselectAll);
@@ -966,106 +961,6 @@ const VIC = (() => {
     }
   }
 
-  async function searchHongguoByName() {
-    if (!ensureLicenseAccess('tìm phim Hongguo')) return;
-    const input = $('hongguoSearchInput');
-    const button = $('hongguoSearchBtn');
-    const container = $('hongguoSearchResults');
-    const query = input?.value.trim() || '';
-    if (!query) return showStatus('Hãy nhập tên phim Hongguo cần tìm.', 'warn');
-
-    if (button) {
-      button.disabled = true;
-      button.textContent = 'Đang tìm...';
-    }
-    if (container) {
-      container.replaceChildren();
-      const loading = document.createElement('div');
-      loading.className = 'hongguo-empty';
-      loading.textContent = 'Đang tải danh mục và tìm phim...';
-      container.appendChild(loading);
-    }
-
-    try {
-      const response = await api?.searchHongguoSeries?.({ query, limit: 30 });
-      renderHongguoSearchResults(response?.results || []);
-      const shown = response?.results?.length || 0;
-      const total = Number(response?.totalMatches) || shown;
-      showStatus(
-        shown ? `Tìm thấy ${total} bộ phim phù hợp${total > shown ? `, đang hiển thị ${shown}` : ''}.` : `Không tìm thấy phim “${query}”.`,
-        shown ? 'ok' : 'warn',
-      );
-    } catch (error) {
-      renderHongguoSearchResults([]);
-      showStatus(error?.message || 'Không tìm được phim Hongguo lúc này.', 'err');
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = 'Tìm phim';
-      }
-    }
-  }
-
-  function renderHongguoSearchResults(results) {
-    const container = $('hongguoSearchResults');
-    if (!container) return;
-    container.replaceChildren();
-
-    if (!results.length) {
-      const empty = document.createElement('div');
-      empty.className = 'hongguo-empty';
-      empty.textContent = 'Chưa có kết quả phù hợp.';
-      container.appendChild(empty);
-      return;
-    }
-
-    results.forEach(series => {
-      const card = document.createElement('article');
-      card.className = 'hongguo-result-card';
-
-      const cover = document.createElement('img');
-      cover.className = 'hongguo-result-cover';
-      cover.alt = '';
-      cover.loading = 'lazy';
-      cover.referrerPolicy = 'no-referrer';
-      cover.src = series.cover || '';
-
-      const info = document.createElement('div');
-      info.className = 'hongguo-result-info';
-      const title = document.createElement('div');
-      title.className = 'hongguo-result-title';
-      title.textContent = series.title || 'Hongguo';
-      const meta = document.createElement('div');
-      meta.className = 'hongguo-result-meta';
-      meta.textContent = [series.episodeText, ...(series.tags || []).slice(0, 3)].filter(Boolean).join(' · ');
-      info.append(title, meta);
-
-      const select = document.createElement('button');
-      select.className = 'btn btn-primary btn-xs';
-      select.textContent = 'Chọn bộ';
-      select.addEventListener('click', () => chooseHongguoSeries(series, select));
-
-      card.append(cover, info, select);
-      container.appendChild(card);
-    });
-  }
-
-  async function chooseHongguoSeries(series, button) {
-    const url = String(series?.detailUrl || '').trim();
-    if (!url) return;
-    if ($('urlInput')) $('urlInput').value = url;
-    syncHeaderInputState();
-    button.disabled = true;
-    button.textContent = 'Đang quét...';
-    showStatus(`Đang quét các tập công khai của “${series.title || 'Hongguo'}”...`, 'info');
-    try {
-      await scanVideos();
-    } finally {
-      button.disabled = false;
-      button.textContent = 'Chọn bộ';
-    }
-  }
-
   async function scanVideos() {
     if (!ensureLicenseAccess('quet danh sach video')) return;
 
@@ -1088,18 +983,7 @@ const VIC = (() => {
       batchSelected = new Set(batchVideos.map((_, index) => index));
       renderBatch();
       $('videoListSection').style.display = 'block';
-      if (result?.source === 'hongguo') {
-        const total = Number(result.totalFound) || batchVideos.length;
-        const accessible = Number(result.accessibleCount) || batchVideos.length;
-        const limitedByInput = batchVideos.length < accessible;
-        const suffix = limitedByInput ? `; đang hiển thị ${batchVideos.length} theo giới hạn quét` : '';
-        showStatus(
-          `Bộ “${result.seriesTitle || 'Hongguo'}”: tải được ${accessible}/${total} tập công khai${suffix}. Đã chọn sẵn tất cả.`,
-          accessible < total ? 'warn' : 'ok',
-        );
-      } else {
-        showStatus(result?.partial ? `Kh\u00f4i ph\u1ee5c \u0111\u01b0\u1ee3c ${batchVideos.length} video t\u1eeb k\u1ebft qu\u1ea3 qu\u00e9t m\u1ed9t ph\u1ea7n` : `T\u00ecm th\u1ea5y ${batchVideos.length} video`, result?.partial ? 'warn' : 'ok');
-      }
+      showStatus(result?.partial ? `Kh\u00f4i ph\u1ee5c \u0111\u01b0\u1ee3c ${batchVideos.length} video t\u1eeb k\u1ebft qu\u1ea3 qu\u00e9t m\u1ed9t ph\u1ea7n` : `T\u00ecm th\u1ea5y ${batchVideos.length} video`, result?.partial ? 'warn' : 'ok');
     } catch (error) {
       showStatus(error.message, 'err');
     } finally {

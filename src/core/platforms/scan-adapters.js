@@ -6,7 +6,6 @@ const youtube = require('./youtube/youtube-scan');
 const tiktok = require('./tiktok/tiktok-scan');
 const instagram = require('./instagram/instagram-scan');
 const facebook = require('./facebook/facebook-scan');
-const hongguo = require('./hongguo/hongguo-scan');
 
 function resolveScanAdapter(url) {
   switch (detectPlatform(url)) {
@@ -18,8 +17,6 @@ function resolveScanAdapter(url) {
       return instagram;
     case 'facebook':
       return facebook;
-    case 'hongguo':
-      return hongguo;
     default:
       return generic;
   }

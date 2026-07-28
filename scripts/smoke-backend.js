@@ -58,9 +58,6 @@ async function main() {
   assert.equal(DownloadManager.detectPlatform('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), 'youtube');
   assert.equal(DownloadManager.detectPlatform('https://www.tiktok.com/@demo/video/123'), 'tiktok');
   assert.equal(DownloadManager.detectPlatform('https://www.facebook.com/reel/1234567890'), 'facebook');
-  assert.equal(DownloadManager.detectPlatform('https://novelquickapp.com/hongguo/share/123'), 'hongguo');
-  assert.equal(DownloadManager.detectPlatform('https://reading.snssdk.com/reading_offline/drweb/page/123'), 'hongguo');
-  assert.equal(DownloadManager.detectPlatform('https://hongguoduanju.com/player/7660841866979445784'), 'hongguo');
 
   const memory = new Map();
   const smokeStore = {
@@ -95,14 +92,6 @@ async function main() {
   assert.equal(facebookAdapter.allowSingleFallback('https://www.facebook.com/demo.page/reels/'), false, 'facebook collection URL should not single-fallback');
   const genericAdapter = resolveScanAdapter('https://example.com/videos');
   assert.equal(typeof genericAdapter.buildScanArgs, 'function', 'generic scan adapter should be available');
-  const hongguoAdapter = resolveScanAdapter('https://hongguoduanju.com/detail?series_id=7660841866979445784');
-  assert.equal(typeof hongguoAdapter.scanChannelVideos, 'function', 'Hongguo adapter should expose a native series scanner');
-  assert.equal(
-    hongguoAdapter.normalizeScanUrl('https://hongguoduanju.com/player/7660841866979445784/7660843775417125912'),
-    'https://hongguoduanju.com/detail?series_id=7660841866979445784',
-    'Hongguo player URLs should normalize to their series detail page',
-  );
-
   const jobStore = new JobStore(new SettingsStore(smokeStore));
   jobStore.save({
     queue: [{

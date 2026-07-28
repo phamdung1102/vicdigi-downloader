@@ -24,7 +24,7 @@
     <div class="header-url-bar">
       <span class="url-icon" id="urlIcon">🔗</span>
       <input id="urlInput" type="text"
-        placeholder="Dán URL: YouTube · TikTok · Instagram · Facebook · Hongguo · Vimeo · magnet · .torrent…"
+        placeholder="Dán URL: YouTube · TikTok · Instagram · Facebook · Vimeo · magnet · .torrent…"
         autocomplete="off" spellcheck="false" />
       <!-- Nút Lấy thông tin (tab single) -->
       <button class="btn-info-sm" id="getInfoBtn" disabled>
@@ -262,7 +262,6 @@
         <div style="display:flex;gap:6px;margin-bottom:10px;">
           <button class="batch-src-tab active" id="srcTabChannel">📺 Kênh / Danh sách phát</button>
           <button class="batch-src-tab" id="srcTabFacebook">Facebook Page/Reels</button>
-          <button class="batch-src-tab" id="srcTabHongguo">Hongguo</button>
           <button class="batch-src-tab" id="srcTabLinks">📋 Dán nhiều link</button>
           <button class="batch-src-tab" id="srcTabFile">📄 Nhập file .txt</button>
         </div>
@@ -286,18 +285,6 @@
             <span>Thời gian: <b id="facebookScanElapsed">0s</b></span>
             <button class="btn btn-danger btn-xs" id="facebookScanCancelBtn" disabled>Dừng quét</button>
           </div>
-        </div>
-
-        <div id="srcPanelHongguo" style="display:none;">
-          <div class="hongguo-search-row">
-            <input class="field" id="hongguoSearchInput" type="text"
-              placeholder="Nhập tên phim bằng tiếng Trung, ví dụ: 婆婆她不忍了" />
-            <button class="btn btn-primary btn-sm" id="hongguoSearchBtn">Tìm phim</button>
-          </div>
-          <p class="hongguo-search-note">
-            Chọn một bộ trong kết quả để ứng dụng tự quét và chọn các tập đang được xem công khai.
-          </p>
-          <div class="hongguo-results" id="hongguoSearchResults"></div>
         </div>
 
         <!-- Chế độ: Dán nhiều link -->
