@@ -10,6 +10,7 @@ const { isValidYouTubeUrl } = require('./utils');
 const { getVideoInfo, getVideoInfoMulti } = require('./video-info');
 const { downloadVideo, downloadSubtitle, downloadThumbnail } = require('./downloader');
 const { scanChannelVideos } = require('./core/media/scan-service');
+const { searchSeries: searchHongguoSeries } = require('./core/platforms/hongguo/hongguo-scan');
 const { startDomScanner } = require('./core/facebook/fb-dom-scanner');
 const {
   deleteCustomProfile,
@@ -295,6 +296,11 @@ function _registerDownloadManager() {
 
 function _registerBatch() {
 
+  ipcMain.handle('search-hongguo-series', async (_e, payload = {}) => {
+    _requireLicense();
+    return searchHongguoSeries(payload.query, payload.limit);
+  });
+
   ipcMain.handle('scan-channel-videos', async (_e, opts) => {
     _requireLicense();
     const { url, maxVideos = 10 } = opts;
@@ -414,4 +420,3 @@ function setMainWindow(win) { _mainWindow = win; }
 function updateCaps(newCaps) { Object.assign(_caps, newCaps); }
 
 module.exports = { registerAll, setMainWindow, updateCaps };
-

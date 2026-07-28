@@ -6,6 +6,9 @@ const HONGGUO_HOST = /(^|\.)hongguoduanju\.com$/i;
 const MOBILE_USER_AGENT =
   'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
+const CATALOG_CACHE_MS = 15 * 60 * 1000;
+let catalogCache = null;
+let catalogPromise = null;
 
 function normalizeScanUrl(rawUrl) {
   const parsed = new URL(String(rawUrl || '').trim());
@@ -65,6 +68,83 @@ function getText(url, redirectsLeft = 3) {
   });
 }
 
+function extractCatalog(routerData) {
+  const page = routerData?.loaderData?.category_page;
+  const list = page?.recommendList || page?.categoryData?.recommendList || [];
+  return Array.isArray(list) ? list : [];
+}
+
+async function fetchCatalog() {
+  if (catalogCache && Date.now() - catalogCache.loadedAt < CATALOG_CACHE_MS) {
+    return catalogCache.items;
+  }
+  if (catalogPromise) return catalogPromise;
+
+  catalogPromise = Promise.allSettled([0, 1, 2].map(async sortType => {
+    const html = await getText(`https://hongguoduanju.com/category?sort_type=${sortType}`);
+    return extractCatalog(parseRouterData(html));
+  })).then(results => {
+    const unique = new Map();
+    results.forEach(result => {
+      if (result.status !== 'fulfilled') return;
+      result.value.forEach(item => {
+        if (item?.series_id && item?.series_name) unique.set(String(item.series_id), item);
+      });
+    });
+    if (!unique.size) throw new Error('Không tải được danh mục phim Hongguo.');
+    const items = [...unique.values()];
+    catalogCache = { loadedAt: Date.now(), items };
+    return items;
+  }).finally(() => {
+    catalogPromise = null;
+  });
+
+  return catalogPromise;
+}
+
+function normalizeSearchText(value) {
+  return String(value || '').normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, '');
+}
+
+async function searchSeries(query, limit = 30) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) throw new Error('Hãy nhập tên phim cần tìm.');
+
+  const catalog = await fetchCatalog();
+  const ranked = catalog.flatMap(item => {
+    const title = normalizeSearchText(item.series_name);
+    const tags = normalizeSearchText((item.tags || []).join(' '));
+    let rank = -1;
+    if (title === normalizedQuery) rank = 0;
+    else if (title.startsWith(normalizedQuery)) rank = 1;
+    else if (title.includes(normalizedQuery)) rank = 2;
+    else if (tags.includes(normalizedQuery)) rank = 3;
+    return rank < 0 ? [] : [{ item, rank }];
+  });
+
+  ranked.sort((a, b) =>
+    a.rank - b.rank ||
+    String(a.item.series_name).length - String(b.item.series_name).length ||
+    String(a.item.series_name).localeCompare(String(b.item.series_name), 'zh-CN'));
+
+  const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 50);
+  return {
+    success: true,
+    query: String(query).trim(),
+    catalogSize: catalog.length,
+    totalMatches: ranked.length,
+    results: ranked.slice(0, safeLimit).map(({ item }) => ({
+      seriesId: String(item.series_id),
+      title: String(item.series_name),
+      cover: String(item.series_cover || ''),
+      intro: String(item.series_intro || ''),
+      tags: Array.isArray(item.tags) ? item.tags.slice(0, 6) : [],
+      episodeText: String(item.episode_right_text || ''),
+      detailUrl: `https://hongguoduanju.com/detail?series_id=${item.series_id}`,
+    })),
+  };
+}
+
 async function scanChannelVideos(options = {}) {
   const detailUrl = normalizeScanUrl(options.url);
   const html = await getText(detailUrl);
@@ -119,5 +199,6 @@ module.exports = {
   makeScanError,
   normalizeScanUrl,
   parseRouterData,
+  searchSeries,
   scanChannelVideos,
 };

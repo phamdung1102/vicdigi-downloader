@@ -207,7 +207,7 @@ export function createBatchController(deps) {
 
   function switchBatchSrc(mode) {
     persistUi({ batchSourceMode: mode });
-    ['channel', 'facebook', 'links', 'file'].forEach(name => {
+    ['channel', 'facebook', 'hongguo', 'links', 'file'].forEach(name => {
       const title = name.charAt(0).toUpperCase() + name.slice(1);
       $(`srcTab${title}`)?.classList.toggle('active', name === mode);
       $(`srcPanel${title}`).style.display = name === mode ? '' : 'none';

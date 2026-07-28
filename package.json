@@ -1,6 +1,6 @@
 {
   "name": "vicdigi-downloader",
-  "version": "8.0.5",
+  "version": "8.0.6",
   "description": "VICdigi Multi-Platform Downloader v8.0 - YouTube, Instagram, TikTok, Facebook, Twitter/X, Vimeo",
   "main": "main.js",
   "scripts": {

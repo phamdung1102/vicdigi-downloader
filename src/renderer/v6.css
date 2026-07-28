@@ -850,6 +850,87 @@ select.field {
   border-color: var(--accent-border);
 }
 
+.hongguo-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.hongguo-search-row .field {
+  flex: 1;
+}
+
+.hongguo-search-note {
+  margin-top: 7px;
+  color: var(--txt-lo);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.hongguo-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 330px;
+  margin-top: 10px;
+  overflow: auto;
+}
+
+.hongguo-result-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--s2);
+}
+
+.hongguo-result-cover {
+  width: 48px;
+  height: 64px;
+  border-radius: 7px;
+  object-fit: cover;
+  background: var(--s4);
+}
+
+.hongguo-result-info {
+  min-width: 0;
+}
+
+.hongguo-result-title {
+  overflow: hidden;
+  color: var(--txt-hi);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hongguo-result-meta {
+  display: -webkit-box;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--txt-lo);
+  font-size: 10.5px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.hongguo-empty {
+  grid-column: 1 / -1;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  color: var(--txt-lo);
+  font-size: 11.5px;
+  text-align: center;
+}
+
 .facebook-scan-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1126,6 +1207,10 @@ select.field {
   }
 
   .settings-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .hongguo-results {
     grid-template-columns: 1fr;
   }
 

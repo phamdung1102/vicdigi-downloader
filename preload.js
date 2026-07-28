@@ -76,6 +76,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ── Batch ─────────────────────────────────────────────────
   scanChannelVideos: (options) => invoke('scan-channel-videos', options),
+  searchHongguoSeries: (options) => invoke('search-hongguo-series', options),
   scanFacebookPage: (options) => invoke('scan-facebook-page', options),
   cancelFacebookScan: () => invoke('scan-facebook-cancel'),
   onFacebookUidsDiscovered: (callback) => {
@@ -145,4 +146,3 @@ process.on('exit', () => {
 });
 
 console.log('✅ preload.js loaded — electronAPI exposed');
-
