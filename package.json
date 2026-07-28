@@ -1,6 +1,6 @@
 {
   "name": "vicdigi-downloader",
-  "version": "8.5.3",
+  "version": "8.6.0",
   "description": "Andrew Downloader - YouTube, Instagram, TikTok, Facebook, Twitter/X, Vimeo",
   "main": "main.js",
   "scripts": {
@@ -31,7 +31,7 @@
   "author": "AndrewPham",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^38.8.6",
+    "electron": "^27.1.0",
     "electron-builder": "^24.13.3"
   },
   "dependencies": {
