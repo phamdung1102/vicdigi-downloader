@@ -12,7 +12,6 @@ const { detectPlatform } = require('../platforms/detect-platform');
 const { recordYtDlpError } = require('../../diagnostics');
 const { resolveYtDlpPath } = require('../../ytdlp-client');
 const socialDownloads = require('../platforms/social');
-const { createTorrentSession } = require('../media/torrent-service');
 
 class QueueService extends EventBus {
   constructor(options = {}) {
@@ -26,7 +25,6 @@ class QueueService extends EventBus {
     this.retryAttempts = 3;
     this.downloadStates = new Map();
     this.activeProcesses = new Map();
-    this.activeTorrentSessions = new Map();
     this.MAX_HISTORY = 100;
     this._persistTimer = null;
     this.store = options.store || null;
@@ -98,10 +96,6 @@ class QueueService extends EventBus {
     process.on('error', cleanup);
   }
 
-  trackActiveTorrentSession(downloadId, session) {
-    this.activeTorrentSessions.set(downloadId, session);
-  }
-
   async stopActiveHandle(downloadId, reason = 'cancel') {
     const process = this.activeProcesses.get(downloadId);
     if (process) {
@@ -109,13 +103,6 @@ class QueueService extends EventBus {
       this.activeProcesses.delete(downloadId);
     }
 
-    const torrentSession = this.activeTorrentSessions.get(downloadId);
-    if (torrentSession) {
-      this.activeTorrentSessions.delete(downloadId);
-      try {
-        await torrentSession.close({ destroyStore: reason === 'cancel' });
-      } catch (_) {}
-    }
   }
 
   emitProgress(download, output) {
@@ -152,6 +139,14 @@ class QueueService extends EventBus {
   }
 
   addToQueue(downloadInfo) {
+    const duplicateUrl = String(downloadInfo.url || '').trim();
+    const pending = [
+      ...this.queue,
+      ...this.activeDownloads.values(),
+      ...this.pausedDownloads.values(),
+    ].find(item => String(item.url || '').trim() === duplicateUrl);
+    if (pending) return pending.id;
+
     const downloadId = this.generateDownloadId();
     const download = {
       id: downloadId,
@@ -198,7 +193,6 @@ class QueueService extends EventBus {
       this.activeDownloads.delete(nextDownload.id);
       this.pausedDownloads.delete(nextDownload.id);
       this.activeProcesses.delete(nextDownload.id);
-      this.activeTorrentSessions.delete(nextDownload.id);
       if (this.completedDownloads.size >= this.MAX_HISTORY) {
         const firstKey = this.completedDownloads.keys().next().value;
         this.completedDownloads.delete(firstKey);
@@ -210,7 +204,6 @@ class QueueService extends EventBus {
       if (nextDownload.status === 'paused') {
         this.activeDownloads.delete(nextDownload.id);
         this.activeProcesses.delete(nextDownload.id);
-        this.activeTorrentSessions.delete(nextDownload.id);
         this.downloadStates.delete(nextDownload.id);
         if (!this.pausedDownloads.has(nextDownload.id)) {
           this.pausedDownloads.set(nextDownload.id, nextDownload);
@@ -223,7 +216,6 @@ class QueueService extends EventBus {
       if (nextDownload.status === 'cancelled') {
         this.activeDownloads.delete(nextDownload.id);
         this.activeProcesses.delete(nextDownload.id);
-        this.activeTorrentSessions.delete(nextDownload.id);
         this.downloadStates.delete(nextDownload.id);
         this.persistSnapshot();
         this.processQueue();
@@ -239,7 +231,6 @@ class QueueService extends EventBus {
         this.queue.unshift(nextDownload);
         this.activeDownloads.delete(nextDownload.id);
         this.activeProcesses.delete(nextDownload.id);
-        this.activeTorrentSessions.delete(nextDownload.id);
         this.persistSnapshot();
       } else {
         nextDownload.status = 'failed';
@@ -247,7 +238,6 @@ class QueueService extends EventBus {
         this.activeDownloads.delete(nextDownload.id);
         this.pausedDownloads.delete(nextDownload.id);
         this.activeProcesses.delete(nextDownload.id);
-        this.activeTorrentSessions.delete(nextDownload.id);
         this.downloadStates.delete(nextDownload.id);
         if (this.failedDownloads.size >= this.MAX_HISTORY) {
           const firstKey = this.failedDownloads.keys().next().value;
@@ -276,8 +266,6 @@ class QueueService extends EventBus {
         return this.downloadTwitter(download);
       case 'vimeo':
         return this.downloadVimeo(download);
-      case 'torrent':
-        return this.downloadTorrent(download);
       default:
         throw new Error(`Unsupported platform: ${download.platform}`);
     }
@@ -445,47 +433,6 @@ class QueueService extends EventBus {
     });
   }
 
-  async downloadTorrent(download) {
-    if (download.status === 'cancelled') {
-      throw new Error('Download was cancelled');
-    }
-
-    const session = await createTorrentSession({
-      source: download.url,
-      outputPath: download.outputPath,
-      onMetadata: metadata => {
-        if (metadata?.title) download.title = metadata.title;
-        if (metadata?.totalBytes) download.totalBytes = metadata.totalBytes;
-        if (metadata?.fileCount) download.fileCount = metadata.fileCount;
-        if (metadata?.infoHash) download.infoHash = metadata.infoHash;
-        this.schedulePersistSnapshot();
-      },
-      onProgress: payload => {
-        this.emitStructuredProgress(download, payload);
-      },
-      onLog: message => {
-        console.log(`[torrent:${download.id}] ${message}`);
-      },
-    });
-
-    this.trackActiveTorrentSession(download.id, session);
-
-    try {
-      const result = await session.completion;
-      download.outputFile = result.outputFile || '';
-      download.outputPath = result.outputPath || download.outputPath;
-      download.totalBytes = result.totalBytes || download.totalBytes || 0;
-      download.fileCount = result.fileCount || download.fileCount || 0;
-      download.infoHash = result.infoHash || download.infoHash || '';
-      await session.close({ destroyStore: false });
-      this.activeTorrentSessions.delete(download.id);
-      return download;
-    } catch (error) {
-      this.activeTorrentSessions.delete(download.id);
-      throw error;
-    }
-  }
-
   async pauseDownload(downloadId) {
     const download = this.activeDownloads.get(downloadId);
     if (!download) return false;
@@ -519,6 +466,24 @@ class QueueService extends EventBus {
 
   retryDownload(downloadId) {
     return this.resumeDownload(downloadId);
+  }
+
+  async pauseAllDownloads() {
+    const ids = Array.from(this.activeDownloads.keys());
+    let count = 0;
+    for (const id of ids) {
+      if (await this.pauseDownload(id)) count += 1;
+    }
+    return count;
+  }
+
+  resumeAllDownloads() {
+    const ids = Array.from(this.pausedDownloads.keys());
+    let count = 0;
+    ids.forEach(id => {
+      if (this.resumeDownload(id)) count += 1;
+    });
+    return count;
   }
 
   async cancelDownload(downloadId) {
@@ -701,17 +666,13 @@ class QueueService extends EventBus {
       try { process.kill('SIGTERM'); } catch (_) {}
     });
     this.activeProcesses.clear();
-    this.activeTorrentSessions.forEach(session => {
-      session.close({ destroyStore: true }).catch(() => {});
-    });
-    this.activeTorrentSessions.clear();
     this.downloadStates.clear();
     this.persistSnapshot();
     return this.getRecoverableSessionInfo();
   }
 
   // Gọi khi app thoát: dừng mọi tiến trình con để không bỏ lại
-  // yt-dlp/torrent chạy mồ côi, và chốt snapshot cuối cùng ngay lập tức.
+  // yt-dlp chạy mồ côi, và chốt snapshot cuối cùng ngay lập tức.
   shutdown() {
     if (this._persistTimer) {
       clearTimeout(this._persistTimer);
@@ -721,10 +682,6 @@ class QueueService extends EventBus {
       try { process.kill('SIGTERM'); } catch (_) {}
     });
     this.activeProcesses.clear();
-    this.activeTorrentSessions.forEach(session => {
-      try { session.close({ destroyStore: false }).catch(() => {}); } catch (_) {}
-    });
-    this.activeTorrentSessions.clear();
     try { this.persistSnapshot(); } catch (_) {}
   }
 

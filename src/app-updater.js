@@ -14,11 +14,12 @@ const CHECK_DELAY_MS = 5000;              // đợi app ổn định rồi mới
 const RECHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // check lại mỗi 4 giờ khi app mở lâu
 
 let _initialized = false;
+let _autoUpdater = null;
 
 /**
  * @param {BrowserWindow} mainWindow  để đẩy trạng thái update xuống renderer
  */
-function setupAutoUpdater(mainWindow) {
+function setupAutoUpdater(mainWindow, isBusy = () => false) {
   if (_initialized) return;
   if (!app.isPackaged) {
     console.log('[app-updater] Dev mode — bỏ qua auto-update.');
@@ -34,6 +35,7 @@ function setupAutoUpdater(mainWindow) {
   }
 
   _initialized = true;
+  _autoUpdater = autoUpdater;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
@@ -57,6 +59,10 @@ function setupAutoUpdater(mainWindow) {
 
   autoUpdater.on('update-downloaded', async info => {
     sendStatus('downloaded', { version: info?.version });
+    while (isBusy()) {
+      sendStatus('downloaded-deferred', { version: info?.version });
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
     const { response } = await dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: 'Phiên bản VICdigi Downloader mới',
@@ -80,4 +86,10 @@ function setupAutoUpdater(mainWindow) {
   setInterval(check, RECHECK_INTERVAL_MS);
 }
 
-module.exports = { setupAutoUpdater };
+function checkAppUpdates() {
+  if (!_autoUpdater) return Promise.resolve({ success: false, available: false, reason: 'not-packaged' });
+  return _autoUpdater.checkForUpdates()
+    .then(result => ({ success: true, available: Boolean(result?.updateInfo?.version), version: result?.updateInfo?.version || '' }));
+}
+
+module.exports = { setupAutoUpdater, checkAppUpdates };

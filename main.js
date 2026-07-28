@@ -1,10 +1,10 @@
 ﻿// ============================================================
-// main.js — Entry point  (VICdigi Downloader v8.0)
+// main.js — Entry point
 // All heavy logic lives in src/*  — keep this file thin.
 // ============================================================
 'use strict';
 
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, Notification } = require('electron');
 const path  = require('path');
 const fs    = require('fs-extra');
 const Store = require('electron-store');
@@ -78,7 +78,12 @@ function createWindow() {
 
   // Open external links in system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    require('electron').shell.openExternal(url);
+    try {
+      const target = new URL(url);
+      if (target.protocol === 'https:' || target.protocol === 'http:') {
+        require('electron').shell.openExternal(target.toString());
+      }
+    } catch (_) {}
     return { action: 'deny' };
   });
 }
@@ -114,7 +119,12 @@ app.whenReady().then(async () => {
   mainWindow.setTitle(`VICdigi Downloader v${app.getVersion()}`);
 
   // 4b. Auto-update qua GitHub Releases (chỉ chạy với bản packaged)
-  if (!IS_SMOKE_RENDERER) setupAutoUpdater(mainWindow);
+  if (!IS_SMOKE_RENDERER) {
+    setupAutoUpdater(mainWindow, () => {
+      const downloads = _dlManagerRef?.getAllDownloads?.() || {};
+      return Boolean((downloads.active?.length || 0) + (downloads.queued?.length || 0));
+    });
+  }
 
   // 5. Push caps xuống renderer — dù window đã load hay chưa đều ok
   const sendCaps = () => {
@@ -149,7 +159,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Dừng yt-dlp/torrent đang chạy + chốt snapshot trước khi thoát
+// Dừng các tác vụ đang chạy và chốt snapshot trước khi thoát
 app.on('before-quit', () => {
   try { _dlManagerRef?.shutdown?.(); } catch (_) {}
 });
@@ -170,6 +180,20 @@ function _setupDlManagerEvents(dlManager) {
   for (const [emitterEv, ipcChannel] of Object.entries(eventMap)) {
     dlManager.on(emitterEv, data => {
       if (mainWindow?.webContents) mainWindow.webContents.send(ipcChannel, data);
+      if (app.isPackaged && Notification.isSupported() && (emitterEv === 'download-completed' || emitterEv === 'download-failed')) {
+        const ok = emitterEv === 'download-completed';
+        const notification = new Notification({
+          title: ok ? 'Tải xuống hoàn tất' : 'Tải xuống chưa thành công',
+          body: String(data?.title || data?.url || 'Tác vụ tải xuống').slice(0, 180),
+          icon: path.join(__dirname, 'assets', 'icon.ico'),
+        });
+        notification.on('click', () => {
+          if (mainWindow?.isMinimized()) mainWindow.restore();
+          mainWindow?.show();
+          mainWindow?.focus();
+        });
+        notification.show();
+      }
     });
   }
 }
@@ -200,5 +224,5 @@ async function _runRendererSmoke(window) {
   throw new Error('Renderer boot timeout after 15s');
 }
 
-console.log('🚀 VICdigi Downloader v8.0 — main.js loaded');
+console.log(`🚀 VICdigi Downloader v${app.getVersion()} — main.js loaded`);
 

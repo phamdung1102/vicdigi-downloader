@@ -65,12 +65,6 @@ const VIC = (() => {
     };
   };
   const isYouTubeUrl = url => /(?:youtube\.com|youtu\.be)/i.test(String(url || ''));
-  const isTorrentSource = value => {
-    const source = String(value || '').trim();
-    if (!source) return false;
-    if (/^magnet:\?/i.test(source)) return true;
-    return /\.torrent(?:[?#].*)?$/i.test(source);
-  };
   const randomBetween = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   const getInterVideoDelayMs = (video, index, total) => {
     if (isSmokeRenderer) return 0;
@@ -89,6 +83,7 @@ const VIC = (() => {
       await loadDownloadProfiles();
       await loadPersistenceStatus();
       await loadLicenseStatus();
+      await loadAppInfo();
       wireEvents();
       applyTheme(ui.theme);
       applyUi();
@@ -115,18 +110,16 @@ const VIC = (() => {
     $('urlInput')?.addEventListener('keydown', event => {
       if (event.key !== 'Enter') return;
       if (currentTab === 'batch') return $('scanBtnHeader') && !$('scanBtnHeader').disabled ? scanVideos() : null;
-      if (isTorrentSource($('urlInput')?.value) && $('downloadVideoBtn') && !$('downloadVideoBtn').disabled) {
-        event.preventDefault();
-        return downloadVideo();
-      }
       if ($('getInfoBtn') && !$('getInfoBtn').disabled) getVideoInfo();
     });
     on('getInfoBtn', 'click', getVideoInfo);
     on('scanBtnHeader', 'click', scanVideos);
     on('selectFolderBtn', 'click', selectFolder);
-    on('pickTorrentBtn', 'click', pickTorrentFile);
+    on('pasteUrlBtn', 'click', pasteUrlFromClipboard);
     on('selectCookieFileBtn', 'click', selectCookieFile);
     on('clearCookieFileBtn', 'click', clearCookieFile);
+    on('openLogsBtn', 'click', () => api?.openLogsFolder?.());
+    on('clearPrivateDataBtn', 'click', clearPrivateData);
     on('downloadVideoBtn', 'click', downloadVideo);
     on('downloadSubtitleBtn', 'click', downloadSubtitle);
     on('downloadThumbnailBtn', 'click', downloadThumbnail);
@@ -135,6 +128,7 @@ const VIC = (() => {
     on('cancelBatchBtn', 'click', cancelBatchDownload);
     on('themeToggleBtn', 'click', toggleTheme);
     on('openUpdateBtn', 'click', openUpdateFromSettings);
+    on('checkAppUpdateBtn', 'click', checkApplicationUpdate);
     on('nav-single', 'click', () => switchTab('single'));
     on('nav-batch', 'click', () => switchTab('batch'));
     on('nav-history', 'click', () => switchTab('history'));
@@ -170,6 +164,8 @@ const VIC = (() => {
     on('dcRefreshBtn', 'click', refreshDownloadCenter);
     on('dcClearCompletedBtn', 'click', clearCompletedDownloads);
     on('dcClearFailedBtn', 'click', clearFailedDownloads);
+    on('dcPauseAllBtn', 'click', pauseAllDownloads);
+    on('dcResumeAllBtn', 'click', resumeAllDownloads);
     on('clearHistoryBtn', 'click', clearHistory);
     on('settingsCloseBtn', 'click', closeSettingsModal);
     on('settingsDoneBtn', 'click', closeSettingsModal);
@@ -180,6 +176,9 @@ const VIC = (() => {
     on('resultCloseBtn', 'click', closeResultModal);
     on('resultRetryFailedBtn', 'click', retryFailedBatch);
     on('resultOpenFolderBtn', 'click', openResultFolder);
+    document.querySelectorAll('[data-preset]').forEach(button => {
+      button.addEventListener('click', () => applyQuickPreset(button.dataset.preset));
+    });
     $('batchLinksInput')?.addEventListener('input', () => $('linkCount').textContent = `${$('batchLinksInput').value.split('\n').filter(line => line.trim().startsWith('http')).length} URL`);
     $('batchFileInput')?.addEventListener('change', event => loadLinksFromFile(event.target));
     bindUiField('maxVideos', 'maxVideos', value => {
@@ -195,6 +194,7 @@ const VIC = (() => {
     wireOverlay('updateOverlay', closeUpdateModal);
     wireOverlay('resultOverlay', closeResultModal);
     api?.onCapabilitiesUpdated?.(applyCaps);
+    api?.onAppUpdateStatus?.(handleAppUpdateStatus);
     api?.onFacebookUidsDiscovered?.(handleFacebookUidsDiscovered);
     api?.onFacebookScanStatus?.(handleFacebookScanStatus);
     wireDownloadCenterEvents();
@@ -377,6 +377,40 @@ const VIC = (() => {
     showStatus(TEXT.downloadCenter.clearFailed, 'ok');
   }
 
+  async function checkApplicationUpdate() {
+    if ($('appUpdateStatusText')) $('appUpdateStatusText').textContent = 'Đang kiểm tra bản cập nhật ứng dụng…';
+    const result = await api?.checkAppUpdate?.();
+    if (!result?.success && result?.reason === 'not-packaged') {
+      if ($('appUpdateStatusText')) $('appUpdateStatusText').textContent = 'Chỉ kiểm tra cập nhật trên bản đã cài đặt.';
+    }
+  }
+
+  function handleAppUpdateStatus(payload = {}) {
+    if (!$('appUpdateStatusText')) return;
+    const labels = {
+      checking: 'Đang kiểm tra bản cập nhật ứng dụng…',
+      none: 'Bạn đang dùng phiên bản mới nhất.',
+      available: `Có bản ${payload.version || 'mới'}, đang tải nền…`,
+      downloading: `Đang tải bản cập nhật… ${payload.percent || 0}%`,
+      downloaded: `Bản ${payload.version || 'mới'} đã sẵn sàng để cài đặt.`,
+      'downloaded-deferred': `Bản ${payload.version || 'mới'} đã tải xong, sẽ cài sau khi các tác vụ hoàn tất.`,
+      error: 'Không thể kiểm tra cập nhật lúc này.',
+    };
+    $('appUpdateStatusText').textContent = labels[payload.status] || labels.error;
+  }
+
+  async function pauseAllDownloads() {
+    const result = await api?.pauseAllDownloads?.();
+    await refreshDownloadCenter();
+    showStatus(`Đã tạm dừng ${result?.count || 0} tác vụ đang chạy.`, 'info');
+  }
+
+  async function resumeAllDownloads() {
+    const result = await api?.resumeAllDownloads?.();
+    await refreshDownloadCenter();
+    showStatus(`Đã tiếp tục ${result?.count || 0} tác vụ.`, 'ok');
+  }
+
 
   async function openDownloadJobFolder(job) {
     const target = job.outputPath || '';
@@ -533,27 +567,19 @@ const VIC = (() => {
   function syncHeaderInputState() {
     const inputValue = $('urlInput')?.value.trim() || '';
     const urlLength = inputValue.length;
-    const torrentMode = isTorrentSource(inputValue);
-
-    if (torrentMode) {
-      videoInfo = null;
-      if ($('videoCard')) $('videoCard').style.display = 'none';
-    }
-
-    if ($('urlIcon')) $('urlIcon').textContent = torrentMode ? '🧲' : '🔗';
-    if ($('getInfoBtn')) $('getInfoBtn').disabled = urlLength < 10 || torrentMode;
-    if ($('getInfoLabel')) $('getInfoLabel').textContent = torrentMode ? 'Không cần info' : 'Lấy thông tin';
+    if ($('urlIcon')) $('urlIcon').textContent = '🔗';
+    if ($('getInfoBtn')) $('getInfoBtn').disabled = urlLength < 10;
+    if ($('getInfoLabel')) $('getInfoLabel').textContent = 'Lấy thông tin';
     if ($('scanBtnHeader')) $('scanBtnHeader').disabled = urlLength < 5;
   }
 
   function syncToolAvailability() {
     syncHeaderInputState();
     const hasVideoInfo = !!videoInfo;
-    const hasTorrentSource = isTorrentSource($('urlInput')?.value);
 
     if ($('downloadVideoBtn')) {
-      $('downloadVideoBtn').disabled = !(hasVideoInfo || hasTorrentSource);
-      $('downloadVideoBtn').textContent = hasTorrentSource ? '⬇ Tải Torrent' : '⬇ Tải Video';
+      $('downloadVideoBtn').disabled = !hasVideoInfo;
+      $('downloadVideoBtn').textContent = '⬇ Bắt đầu tải';
     }
     if ($('downloadSubtitleBtn')) $('downloadSubtitleBtn').disabled = !hasVideoInfo;
     if ($('downloadThumbnailBtn')) $('downloadThumbnailBtn').disabled = !hasVideoInfo;
@@ -762,6 +788,12 @@ const VIC = (() => {
     if ($('modeBadge')) { $('modeBadge').textContent = mode.label; $('modeBadge').className = `mode-badge ${mode.cls}`; }
     if ($('ytdlpDot')) $('ytdlpDot').className = `ytdlp-dot ${mode.dot}`;
     if ($('ytdlpVer')) $('ytdlpVer').textContent = caps?.ytdlp ? 'Sẵn sàng' : 'Chưa tìm thấy';
+    if ($('systemComponentsText')) {
+      $('systemComponentsText').textContent = [
+        `Bộ tải: ${caps?.ytdlp ? 'sẵn sàng' : 'chưa sẵn sàng'}`,
+        `Xử lý media: ${caps?.ffmpeg ? 'sẵn sàng' : 'chưa sẵn sàng'}`,
+      ].join(' · ');
+    }
   }
 
 
@@ -823,13 +855,49 @@ const VIC = (() => {
 
 
   async function selectBatchFolder() { const folder = await api?.selectDownloadFolder?.(); if (folder) $('batchFolderInput').value = folder; }
-  async function pickTorrentFile() {
-    const filePath = await api?.selectTorrentFile?.();
-    if (!filePath) return;
-    if (currentTab !== 'single') switchTab('single');
-    if ($('urlInput')) $('urlInput').value = filePath;
-    syncToolAvailability();
-    showStatus('Đã nạp file .torrent. Chọn thư mục lưu rồi bấm Tải Video.', 'info');
+  async function pasteUrlFromClipboard() {
+    const value = String(await api?.readClipboardText?.() || '').trim();
+    if (!/^https?:\/\//i.test(value)) return showStatus('Clipboard chưa có liên kết video hợp lệ.', 'warn');
+    setValue('urlInput', value);
+    syncHeaderInputState();
+    if (currentTab === 'single') await getVideoInfo();
+  }
+
+  async function loadAppInfo() {
+    const info = await api?.getAppInfo?.();
+    if ($('appVersionText')) $('appVersionText').textContent = `VICdigi Downloader ${info?.version ? `v${info.version}` : ''}`;
+    if ($('systemComponentsText')) {
+      const caps = info?.capabilities || {};
+      $('systemComponentsText').textContent = [
+        `Bộ tải: ${caps.ytdlp ? 'sẵn sàng' : 'chưa sẵn sàng'}`,
+        `Xử lý media: ${caps.ffmpeg ? 'sẵn sàng' : 'chưa sẵn sàng'}`,
+      ].join(' · ');
+    }
+  }
+
+  async function clearPrivateData() {
+    if (!window.confirm('Xóa cookies đã chọn và lịch sử tải trên máy này?')) return;
+    await api?.clearPrivateData?.();
+    socialCookiePath = '';
+    history = [];
+    applySocialCookiePath();
+    renderHistory();
+    showStatus('Đã xóa dữ liệu riêng tư lưu cục bộ.', 'ok');
+  }
+
+  function applyQuickPreset(preset) {
+    const presets = {
+      compatible: { format: 'mp4', quality: '1080p' },
+      quality: { format: 'mp4', quality: 'best' },
+      audio: { format: 'mp3', quality: 'best' },
+    };
+    const selected = presets[preset] || presets.compatible;
+    setValue('videoFormat', selected.format);
+    setValue('videoQuality', selected.quality);
+    document.querySelectorAll('[data-preset]').forEach(button => {
+      button.classList.toggle('active', button.dataset.preset === preset);
+    });
+    showStatus(`Đã chọn cấu hình ${preset === 'quality' ? 'Chất lượng cao' : preset === 'audio' ? 'Chỉ nghe' : 'Nhanh & tương thích'}.`, 'info');
   }
   function disableDownloadButtons() { ['downloadVideoBtn', 'downloadSubtitleBtn', 'downloadThumbnailBtn'].forEach(id => { if ($(id)) $(id).disabled = true; }); }
   function enableDownloadButtons() { syncToolAvailability(); }
@@ -882,20 +950,31 @@ const VIC = (() => {
     const url = $('urlInput').value.trim();
     const folder = $('folderInput').value.trim();
     if (!url || !folder) return showStatus('\u0056ui l\u00f2ng ch\u1ecdn th\u01b0 m\u1ee5c l\u01b0u', 'warn');
+    const disk = await api?.checkDiskSpace?.(folder);
+    if (disk?.success && disk.freeBytes < 512 * 1024 * 1024) {
+      return showStatus('Ổ đĩa còn dưới 512 MB. Hãy chọn thư mục khác trước khi tải.', 'warn');
+    }
     const format = $('videoFormat').value;
     const quality = $('videoQuality').value;
-    const torrentMode = isTorrentSource(url);
     $('downloadVideoBtn').disabled = true;
-    showProgress(torrentMode
-      ? '\u0110ang t\u1ea3i torrent...'
-      : `\u0110ang t\u1ea3i ${format.toUpperCase()} ${quality}...`);
-    showStatus(torrentMode ? '\u0042\u1eaft \u0111\u1ea7u t\u1ea3i torrent...' : '\u0042\u1eaft \u0111\u1ea7u t\u1ea3i video...', 'info');
+    showProgress(`\u0110ang t\u1ea3i ${format.toUpperCase()} ${quality}...`);
+    showStatus('\u0042\u1eaft \u0111\u1ea7u t\u1ea3i video...', 'info');
     const removeProgress = api?.onDownloadProgress?.(data => setProgress(data.percent || 0));
     try {
-      const result = await api.downloadVideo({ url, outputPath: folder, format, quality, title: videoInfo?.title || '' });
+      const result = await api.downloadVideo({
+        url,
+        outputPath: folder,
+        format,
+        quality,
+        title: videoInfo?.title || '',
+        filenameTemplate: $('filenameTemplate')?.value || 'title',
+        conflictPolicy: $('fileConflictPolicy')?.value || 'rename',
+        embedMetadata: $('embedMetadata')?.checked !== false,
+        embedThumbnail: Boolean($('embedThumbnail')?.checked),
+      });
       hideProgress();
       showStatus(`T\u1ea3i xong! File: ${result.filePath || folder}`, 'ok');
-      addHistory({ type: torrentMode ? 'torrent' : 'video', title: videoInfo?.title || url, url, format, quality, folder });
+      addHistory({ type: 'video', title: videoInfo?.title || url, url, format, quality, folder });
     } catch (error) {
       hideProgress();
       showStatus(error.message, 'err');

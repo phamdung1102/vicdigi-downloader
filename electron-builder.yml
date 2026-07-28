@@ -79,7 +79,7 @@ nsis:
   installerHeaderIcon: assets/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: VICdigi Downloader v8.0
+  shortcutName: VICdigi Downloader
   license: LICENSE.md
   deleteAppDataOnUninstall: false
   menuCategory: true

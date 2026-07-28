@@ -65,26 +65,40 @@ async function downloadThumbnail(opts) {
   return { success: true, filePath: infoPath, note: '\u004b\u0068\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c \u1ea3nh thumbnail.' };
 }
 
-async function realDownload(url, outputPath, format, quality, onProgress, appDir) {
+async function realDownload(url, outputPath, format, quality, onProgress, appDir, options = {}) {
   return new Promise((resolve, reject) => {
     const formatSelector = format === 'mp3'
       ? 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio'
       : (FORMAT_SELECTORS[quality] || FORMAT_SELECTORS.default);
 
+    const templates = {
+      title: '%(title)s.%(ext)s',
+      'channel-title': '%(uploader)s - %(title)s.%(ext)s',
+      'date-title': '%(upload_date>%Y-%m-%d)s - %(title)s.%(ext)s',
+      'playlist-index-title': '%(playlist_title,Playlist)s/%(playlist_index)03d - %(title)s.%(ext)s',
+    };
+    let outputTemplate = templates[options.filenameTemplate] || templates.title;
+    if (options.conflictPolicy === 'rename') {
+      outputTemplate = outputTemplate.replace('.%(ext)s', ' [%(id)s].%(ext)s');
+    }
     const args = withCommonArgs([
       '--format', formatSelector,
-      '--output', path.join(outputPath, '%(title)s.%(ext)s'),
+      '--output', path.join(outputPath, outputTemplate),
       '--no-playlist', '--newline',
       '--merge-output-format', 'mp4',
       '--concurrent-fragments', '4',
       '--retries', '3', '--fragment-retries', '3',
       '--no-write-subs', '--no-write-auto-subs',
     ]);
+    if (options.conflictPolicy === 'overwrite') args.push('--force-overwrites');
+    else if (options.conflictPolicy === 'skip') args.push('--no-overwrites');
+    else args.push('--no-overwrites');
 
     if (format === 'mp3') {
       args.push('--extract-audio', '--audio-format', 'mp3', '--audio-quality', '192K');
     } else {
-      args.push('--embed-metadata');
+      if (options.embedMetadata !== false) args.push('--embed-metadata');
+      if (options.embedThumbnail) args.push('--write-thumbnail', '--embed-thumbnail');
     }
     args.push(url);
 
@@ -281,7 +295,7 @@ async function safeDownloadVideo(opts, onProgress, caps, appDir) {
   const { url, outputPath, format = 'mp4', quality = '720p' } = opts;
   await fs.ensureDir(outputPath);
   if (caps?.ytdlp) {
-    return realDownload(url, outputPath, format, quality, onProgress, appDir);
+    return realDownload(url, outputPath, format, quality, onProgress, appDir, opts);
   }
   return mockDownload(url, outputPath, format, quality, onProgress);
 }

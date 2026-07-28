@@ -19,7 +19,7 @@ export const TEXT = {
     dark: 'TOI',
   },
   placeholders: {
-    singleUrl: 'D\\u00e1n URL: YouTube / TikTok / Instagram / Facebook / Vimeo / magnet / .torrent...',
+    singleUrl: 'D\\u00e1n li\\u00ean k\\u1ebft video: YouTube / TikTok / Instagram / Facebook / Vimeo...',
     batchUrl: 'D\\u00e1n URL k\\u00eanh ho\\u1eb7c danh s\\u00e1ch ph\\u00e1t YouTube...',
   },
   single: {

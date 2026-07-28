@@ -22,7 +22,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── Download ──────────────────────────────────────────────
   selectDownloadFolder: () => invoke('select-download-folder'),
   selectCookieFile: () => invoke('select-cookie-file'),
-  selectTorrentFile: () => invoke('select-torrent-file'),
   downloadVideo: (options) => invoke('download-video', options),
   downloadSubtitle: (options) => invoke('download-subtitle', options),
   downloadThumbnail: (options) => invoke('download-thumbnail', options),
@@ -32,6 +31,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openPath: (targetPath) => invoke('open-path', targetPath),
   showItemInFolder: (targetPath) => invoke('show-item-in-folder', targetPath),
   copyText: (text) => invoke('copy-text', text),
+  readClipboardText: () => invoke('read-clipboard-text'),
+  getAppInfo: () => invoke('get-app-info'),
+  checkDiskSpace: (folderPath) => invoke('check-disk-space', folderPath),
+  openLogsFolder: () => invoke('open-logs-folder'),
+  clearPrivateData: () => invoke('clear-private-data'),
+  checkAppUpdate: () => invoke('check-app-update'),
 
   // ── System ────────────────────────────────────────────────
   getSystemCapabilities: () => invoke('get-system-capabilities'),
@@ -73,6 +78,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setMaxParallelDownloads: (max) => invoke('set-max-parallel', max),
   clearCompleted: () => invoke('clear-completed'),
   clearFailed: () => invoke('clear-failed'),
+  pauseAllDownloads: () => invoke('pause-all-downloads'),
+  resumeAllDownloads: () => invoke('resume-all-downloads'),
 
   // ── Batch ─────────────────────────────────────────────────
   scanChannelVideos: (options) => invoke('scan-channel-videos', options),

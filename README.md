@@ -1,11 +1,14 @@
 # VICdigi Downloader
 
-Electron desktop app for downloading media from YouTube and common social platforms, with subtitle, thumbnail, batch, queue, and torrent support.
+Electron desktop app for downloading media from YouTube and common social platforms, with subtitle, thumbnail, batch, profiles, a persistent queue, and automatic updates.
 
 ## Version
-`8.0.0` — Electron 38, auto-update via GitHub Releases.
+`8.1.0` — Electron 38, auto-update via GitHub Releases.
 
 ## Highlights
+- Focused video workflow with quick presets, advanced naming/conflict controls, disk-space checks, and clipboard paste.
+- Download Center supports pause/resume-all actions, persistent recovery, and Windows completion notifications.
+- Production dependencies are audited during release preparation.
 - Shared `yt-dlp` client for info lookup, downloads, updater, and batch scan.
 - Renderer logic split into `src/renderer/` and stylesheet extracted to `src/renderer/v6.css`.
 - Safer DOM rendering for batch/history content and no inline event handlers in `index-v6.html`.

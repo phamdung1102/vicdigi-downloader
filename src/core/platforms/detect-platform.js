@@ -3,9 +3,6 @@
 function detectPlatform(url = '') {
   const raw = String(url || '').trim();
   const source = raw.toLowerCase();
-  if (source.startsWith('magnet:?')) return 'torrent';
-  if (/^https?:\/\/.+\.torrent(?:[?#].*)?$/i.test(raw)) return 'torrent';
-  if (/\.torrent$/i.test(raw)) return 'torrent';
   if (source.includes('youtube.com') || source.includes('youtu.be')) return 'youtube';
   if (source.includes('instagram.com')) return 'instagram';
   if (source.includes('tiktok.com') || source.includes('vm.tiktok.com') || source.includes('vt.tiktok.com')) return 'tiktok';

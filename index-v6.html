@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob: file:; connect-src 'self' https:; media-src 'self' https: data: blob:; font-src 'self' data:;">
-<title>VICdigi Downloader v8.0</title>
+<title>VICdigi Downloader</title>
 <link rel="stylesheet" href="./src/renderer/v6.css">
 </head>
 <body>
@@ -24,7 +24,7 @@
     <div class="header-url-bar">
       <span class="url-icon" id="urlIcon">🔗</span>
       <input id="urlInput" type="text"
-        placeholder="Dán URL: YouTube · TikTok · Instagram · Facebook · Vimeo · magnet · .torrent…"
+        placeholder="Dán liên kết video hoặc playlist…"
         autocomplete="off" spellcheck="false" />
       <!-- Nút Lấy thông tin (tab single) -->
       <button class="btn-info-sm" id="getInfoBtn" disabled>
@@ -106,8 +106,8 @@
       <!-- Folder row -->
       <div class="folder-row">
         <input class="field" id="folderInput" type="text" placeholder="Chọn thư mục lưu file…" readonly />
+        <button class="btn btn-ghost btn-sm" id="pasteUrlBtn">Dán liên kết</button>
         <button class="btn btn-ghost btn-sm" id="selectFolderBtn">📁 Thư mục</button>
-        <button class="btn btn-ghost btn-sm" id="pickTorrentBtn">🧲 Torrent</button>
       </div>
 
       <!-- Progress -->
@@ -144,10 +144,12 @@
 
       <!-- Video download -->
       <div class="card">
-        <div class="card-title">📹 Tải Video / Audio</div>
-        <p style="font-size:11px;color:var(--txt-lo);line-height:1.6;margin-bottom:9px;">
-          Hỗ trợ cả magnet link và file <code>.torrent</code>. Với torrent, app sẽ tải qua Download Center thay vì bước lấy thông tin video.
-        </p>
+        <div class="card-title">📹 Tùy chọn tải xuống</div>
+        <div class="quick-presets" id="quickPresets">
+          <button class="quick-preset active" type="button" data-preset="compatible">Nhanh &amp; tương thích</button>
+          <button class="quick-preset" type="button" data-preset="quality">Chất lượng cao</button>
+          <button class="quick-preset" type="button" data-preset="audio">Chỉ nghe</button>
+        </div>
         <div class="dl-grid" style="margin-bottom:9px;">
           <div class="field-wrap">
             <label class="field-label">Định dạng</label>
@@ -169,8 +171,34 @@
             </select>
           </div>
         </div>
+        <details class="advanced-options">
+          <summary>Tùy chọn nâng cao</summary>
+          <div class="dl-grid advanced-grid">
+            <div class="field-wrap">
+              <label class="field-label">Mẫu tên file</label>
+              <select class="field" id="filenameTemplate">
+                <option value="title">Tiêu đề</option>
+                <option value="channel-title">Kênh - Tiêu đề</option>
+                <option value="date-title">Ngày - Tiêu đề</option>
+                <option value="playlist-index-title">Playlist / STT - Tiêu đề</option>
+              </select>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Khi file đã tồn tại</label>
+              <select class="field" id="fileConflictPolicy">
+                <option value="rename">Tạo tên mới</option>
+                <option value="skip">Bỏ qua</option>
+                <option value="overwrite">Ghi đè</option>
+              </select>
+            </div>
+          </div>
+          <div class="option-checks">
+            <label><input type="checkbox" id="embedMetadata" checked /> Nhúng metadata</label>
+            <label><input type="checkbox" id="embedThumbnail" /> Nhúng ảnh bìa</label>
+          </div>
+        </details>
         <button class="btn btn-primary btn-full" id="downloadVideoBtn" disabled>
-          ⬇ Tải Video
+          ⬇ Bắt đầu tải
         </button>
       </div>
 
@@ -462,6 +490,20 @@
       </div>
 
       <div class="ver-box settings-card">
+        <div class="settings-row">
+          <div>
+            <div class="field-label">Ứng dụng</div>
+            <div class="settings-note" id="appVersionText">Đang đọc phiên bản…</div>
+            <div class="settings-note" id="systemComponentsText">Đang kiểm tra thành phần hệ thống…</div>
+          </div>
+          <div class="dc-toolbar">
+            <button class="btn btn-ghost btn-sm" id="openLogsBtn">Mở log</button>
+            <button class="btn btn-danger btn-sm" id="clearPrivateDataBtn">Xóa dữ liệu riêng tư</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ver-box settings-card">
         <div class="field-wrap">
           <label class="field-label" for="profileSelect">Mẫu cấu hình tải</label>
           <select class="field" id="profileSelect">
@@ -506,8 +548,12 @@
           <div class="field-label">Thành phần hệ thống</div>
           <div class="settings-note">Kiểm tra và cập nhật các thành phần hỗ trợ tải xuống.</div>
             <div class="settings-note" id="persistenceStatusText">Persistence: đang kiểm tra…</div>
+            <div class="settings-note" id="appUpdateStatusText">Ứng dụng sẽ tự kiểm tra bản cập nhật.</div>
           </div>
-          <button class="btn btn-primary btn-sm" id="openUpdateBtn">Kiểm tra hệ thống</button>
+          <div class="dc-toolbar">
+            <button class="btn btn-ghost btn-sm" id="checkAppUpdateBtn">Cập nhật ứng dụng</button>
+            <button class="btn btn-primary btn-sm" id="openUpdateBtn">Cập nhật hệ thống</button>
+          </div>
         </div>
       </div>
     </div>
@@ -613,6 +659,8 @@
 
     <div class="modal-footer" style="justify-content:space-between;">
       <div class="dc-toolbar">
+        <button class="btn btn-ghost btn-xs" id="dcPauseAllBtn">Tạm dừng tất cả</button>
+        <button class="btn btn-ghost btn-xs" id="dcResumeAllBtn">Tiếp tục tất cả</button>
         <button class="btn btn-ghost btn-xs" id="dcRefreshBtn">Làm mới</button>
         <button class="btn btn-ghost btn-xs" id="dcClearCompletedBtn">Xóa đã xong</button>
         <button class="btn btn-ghost btn-xs" id="dcClearFailedBtn">Xóa lỗi</button>

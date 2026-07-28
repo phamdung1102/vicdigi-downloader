@@ -4,7 +4,8 @@
 // ============================================================
 'use strict';
 
-const { ipcMain, dialog, shell, clipboard } = require('electron');
+const { ipcMain, dialog, shell, clipboard, app } = require('electron');
+const fs = require('fs-extra');
 
 const { isValidYouTubeUrl } = require('./utils');
 const { getVideoInfo, getVideoInfoMulti } = require('./video-info');
@@ -19,6 +20,7 @@ const {
 const { LicenseService } = require('./core/licensing/license-service');
 const { trackActivation, trackDailyHeartbeat, requestOnlineLicense } = require('./core/licensing/activation-tracker');
 const { checkUpdate, downloadUpdate } = require('./ytdlp-updater');
+const { checkAppUpdates } = require('./app-updater');
 const { recordYtDlpError } = require('./diagnostics');
 const DownloadManager = require('../download-manager');
 
@@ -93,13 +95,13 @@ function _registerVideo() {
 
   ipcMain.handle('download-video', async (event, opts) => {
     _requireLicense();
-    const { url, outputPath, format, quality, title } = opts;
+    const { url, outputPath, format, quality, title, filenameTemplate, conflictPolicy, embedMetadata, embedThumbnail } = opts;
     if (!url || !outputPath) throw new Error('url và outputPath là bắt buộc');
 
     const platform = DownloadManager.detectPlatform(url);
 
     // Social platforms → queue via Download Manager
-    if (['instagram', 'facebook', 'tiktok', 'torrent'].includes(platform)) {
+    if (['instagram', 'facebook', 'tiktok'].includes(platform)) {
       if (!_dlManager) throw new Error('Download Manager not ready');
       return _runManagedDownload(event, {
         url,
@@ -115,7 +117,9 @@ function _registerVideo() {
     const onProgress = pct =>
       event.sender.send('download-progress', { percent: pct });
 
-    return downloadVideo({ url, outputPath, format, quality }, onProgress, _caps, _appDir);
+    return downloadVideo({
+      url, outputPath, format, quality, filenameTemplate, conflictPolicy, embedMetadata, embedThumbnail,
+    }, onProgress, _caps, _appDir);
   });
 }
 
@@ -163,18 +167,6 @@ function _registerSystem() {
     return res.canceled ? null : res.filePaths[0];
   });
 
-  ipcMain.handle('select-torrent-file', async () => {
-    const res = await dialog.showOpenDialog(_mainWindow, {
-      properties: ['openFile'],
-      title: 'Chọn file .torrent',
-      filters: [
-        { name: 'Torrent', extensions: ['torrent'] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-    });
-    return res.canceled ? null : res.filePaths[0];
-  });
-
   ipcMain.handle('open-folder', async (_e, folderPath) => {
     await shell.openPath(folderPath);
     return { success: true };
@@ -192,6 +184,33 @@ function _registerSystem() {
 
   ipcMain.handle('copy-text', (_e, text) => {
     clipboard.writeText(String(text || ''));
+    return { success: true };
+  });
+  ipcMain.handle('read-clipboard-text', () => clipboard.readText());
+  ipcMain.handle('get-app-info', () => ({
+    version: app.getVersion(),
+    name: app.getName(),
+    packaged: app.isPackaged,
+    capabilities: { ..._caps },
+  }));
+  ipcMain.handle('check-disk-space', async (_e, folderPath) => {
+    const target = String(folderPath || '').trim();
+    if (!target) return { success: false, error: 'Thiếu thư mục cần kiểm tra.' };
+    const stats = await fs.statfs(target);
+    return {
+      success: true,
+      freeBytes: Number(stats.bavail) * Number(stats.bsize),
+      totalBytes: Number(stats.blocks) * Number(stats.bsize),
+    };
+  });
+  ipcMain.handle('open-logs-folder', async () => {
+    const logsPath = app.getPath('logs');
+    await fs.ensureDir(logsPath);
+    await shell.openPath(logsPath);
+    return { success: true, path: logsPath };
+  });
+  ipcMain.handle('clear-private-data', () => {
+    ['socialCookiesPath', 'history', 'downloadHistory'].forEach(key => _store.delete(key));
     return { success: true };
   });
 
@@ -260,6 +279,7 @@ function _registerSystem() {
     success: true,
     licenseStatus: _licenseSvc?.clear?.() || null,
   }));
+  ipcMain.handle('check-app-update', () => checkAppUpdates());
 }
 
 // ── PERSISTENT STORE ─────────────────────────────────────────
@@ -289,6 +309,8 @@ function _registerDownloadManager() {
   ipcMain.handle('set-max-parallel',  (_e, n)  => { _dlManager?.setMaxParallelDownloads(n); return { success: true }; });
   ipcMain.handle('clear-completed',   ()       => { _dlManager?.clearCompleted(); return { success: true }; });
   ipcMain.handle('clear-failed',      ()       => { _dlManager?.clearFailed();    return { success: true }; });
+  ipcMain.handle('pause-all-downloads', async () => ({ success: true, count: await (_dlManager?.pauseAllDownloads?.() || 0) }));
+  ipcMain.handle('resume-all-downloads', () => ({ success: true, count: _dlManager?.resumeAllDownloads?.() || 0 }));
 }
 
 // ── BATCH ────────────────────────────────────────────────────
