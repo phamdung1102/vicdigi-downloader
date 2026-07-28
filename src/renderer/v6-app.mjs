@@ -1236,7 +1236,6 @@ const VIC = (() => {
 
     const maxVideos = parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos;
     await persistUi({ maxVideos, batchSourceMode: 'facebook' });
-    resetFacebookMetadataResolver();
     facebookScanUids = new Set();
     batchVideos = [];
     batchSelected.clear();
@@ -1262,29 +1261,25 @@ const VIC = (() => {
   }
 
   function handleFacebookUidsDiscovered(uids = []) {
-    const scanToken = facebookMetadataScanToken;
-    const newVideos = [];
+    let changed = false;
     for (const rawUid of uids) {
       const uid = String(rawUid || '').trim();
       if (!/^\d+$/.test(uid)) continue;
 
-      if (facebookScanUids.has(uid)) continue;
-
-      facebookScanUids.add(uid);
-      newVideos.push(makeFacebookBatchVideo(uid, batchVideos.length + newVideos.length));
+      if (!facebookScanUids.has(uid)) {
+        facebookScanUids.add(uid);
+        changed = true;
+      }
     }
 
-    if (!newVideos.length) return;
-    batchVideos = [...batchVideos, ...newVideos];
+    if (!changed) return;
+    const ids = [...facebookScanUids];
+    batchVideos = ids.map(makeFacebookBatchVideo);
     batchSelected = new Set(batchVideos.map((_, index) => index));
     renderBatch();
     $('videoListSection').style.display = 'block';
-    updateFacebookScanMetrics({ state: 'Đang quét', found: batchVideos.length });
-    showStatus(`Đã phát hiện ${batchVideos.length} link Facebook, đang nạp thông tin video...`, 'info');
-
-    for (const video of newVideos) {
-      enqueueFacebookMetadata(video.videoId, video.url, scanToken);
-    }
+    updateFacebookScanMetrics({ state: 'Đang quét', found: ids.length });
+    showStatus(`Đã phát hiện ${ids.length} link Facebook`, 'ok');
   }
 
   function handleFacebookScanStatus(status = {}) {

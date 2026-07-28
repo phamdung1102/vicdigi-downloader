@@ -3,7 +3,7 @@
 Electron desktop app for downloading media from YouTube and common social platforms, with subtitle, thumbnail, batch, profiles, a persistent queue, and automatic updates.
 
 ## Version
-`8.6.0` — Facebook scanner restored on the Electron 27 runtime used by the working VIC Downloader build.
+`8.6.1` — Facebook UID rendering restored exactly from the working VIC Downloader build.
 
 ## Highlights
 - Focused video workflow with quick presets, advanced naming/conflict controls, disk-space checks, and clipboard paste.
