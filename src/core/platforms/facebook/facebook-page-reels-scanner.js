@@ -28,11 +28,6 @@ function isFacebookCollectionUrl(rawUrl) {
   try {
     const parsed = new URL(normalizeFacebookUrl(rawUrl));
     if (!/facebook\.com$/i.test(parsed.hostname)) return false;
-    if (parsed.pathname === '/profile.php') {
-      const profileId = String(parsed.searchParams.get('id') || '').trim();
-      const tab = String(parsed.searchParams.get('sk') || '').trim();
-      return /^\d{6,}$/.test(profileId) && /^(reels?|videos?)(?:_tab)?$/i.test(tab);
-    }
     return /^\/[^/]+\/(?:reels|videos)\/?$/i.test(parsed.pathname);
   } catch (_) {
     return false;

@@ -17,77 +17,13 @@ export function createBatchController(deps) {
     getBatchSourceMode,
     showStatus,
     ensureBatchAccess,
-    getBatchScanTarget,
   } = deps;
-  let titleFilter = '';
-  let sortMode = 'default';
 
   function renderBatch() {
     const { batchVideos, batchSelected } = getState();
     $('totalCount').textContent = batchVideos.length;
-    const scanTarget = Number(getBatchScanTarget?.() || 0);
-    if ($('batchScanTarget')) {
-      $('batchScanTarget').style.display = scanTarget > 0 ? 'inline' : 'none';
-      $('batchScanTarget').textContent = scanTarget > 0
-        ? `· Đã tìm ${batchVideos.length} · Mục tiêu ${scanTarget}`
-        : '';
-    }
-    const visibleVideos = getVisibleVideos(batchVideos);
     updateBatchCount();
-    renderBatchList($('videoGrid'), visibleVideos, batchSelected, toggleBatchSelection, formatDuration);
-    updateBatchEstimate(batchVideos, batchSelected);
-  }
-
-  function getVisibleVideos(videos) {
-    const filtered = videos
-      .map((video, index) => ({ ...video, _sourceIndex: index }))
-      .filter(video => !titleFilter || String(video.title || '').toLocaleLowerCase('vi').includes(titleFilter));
-    const dateValue = video => Number(video.timestamp || video.uploadTimestamp || String(video.uploadDate || '').replace(/\D/g, '') || 0);
-    const sorters = {
-      newest: (a, b) => dateValue(b) - dateValue(a),
-      oldest: (a, b) => dateValue(a) - dateValue(b),
-      'duration-desc': (a, b) => Number(b.duration || 0) - Number(a.duration || 0),
-      'duration-asc': (a, b) => Number(a.duration || 0) - Number(b.duration || 0),
-    };
-    return sorters[sortMode] ? filtered.sort(sorters[sortMode]) : filtered;
-  }
-
-  function updateBatchEstimate(videos, selected) {
-    const selectedVideos = [...selected].map(index => videos[index]).filter(Boolean);
-    const quality = $('batchQuality')?.value || '1080p';
-    const mbps = quality === '4k' ? 18 : quality === '1080p' ? 8 : quality === '720p' ? 5 : 2.5;
-    const seconds = selectedVideos.reduce((sum, video) => sum + Number(video.duration || 0), 0);
-    const bytes = seconds > 0 ? seconds * mbps * 1000000 / 8 : 0;
-    const scanTarget = Number(getBatchScanTarget?.() || 0);
-    $('batchTotalVideos').textContent = scanTarget > 0
-      ? `${videos.length}/${scanTarget} video`
-      : `${videos.length} video`;
-    $('batchSelectedVideos').textContent = `${selectedVideos.length} video`;
-    $('batchEstimatedSize').textContent = bytes ? formatBytes(bytes) : 'Chưa đủ dữ liệu';
-  }
-
-  function formatBytes(bytes) {
-    if (bytes >= 1024 ** 3) return `~ ${(bytes / 1024 ** 3).toFixed(1)} GB`;
-    return `~ ${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`;
-  }
-
-  function setTitleFilter(value) {
-    titleFilter = String(value || '').trim().toLocaleLowerCase('vi');
-    renderBatch();
-  }
-
-  function setSortMode(value) {
-    sortMode = value || 'default';
-    renderBatch();
-  }
-
-  function selectRange(startValue, endValue) {
-    const { batchVideos, batchSelected } = getState();
-    const start = Math.max(1, Number.parseInt(startValue, 10) || 1);
-    const end = Math.min(batchVideos.length, Number.parseInt(endValue, 10) || batchVideos.length);
-    batchSelected.clear();
-    for (let index = start - 1; index < end; index += 1) batchSelected.add(index);
-    renderBatch();
+    renderBatchList($('videoGrid'), batchVideos, batchSelected, toggleBatchSelection, formatDuration);
   }
 
   function toggleBatchSelection(index) {
@@ -270,13 +206,11 @@ export function createBatchController(deps) {
   }
 
   function switchBatchSrc(mode) {
-    const normalizedMode = mode === 'facebook' ? 'facebook' : 'unified';
-    persistUi({ batchSourceMode: normalizedMode });
-    ['unified', 'facebook'].forEach(name => {
+    persistUi({ batchSourceMode: mode });
+    ['channel', 'facebook', 'links', 'file'].forEach(name => {
       const title = name.charAt(0).toUpperCase() + name.slice(1);
-      $(`srcTab${title}`)?.classList.toggle('active', name === normalizedMode);
-      const panel = $(`srcPanel${title}`);
-      if (panel) panel.style.display = name === normalizedMode ? '' : 'none';
+      $(`srcTab${title}`)?.classList.toggle('active', name === mode);
+      $(`srcPanel${title}`).style.display = name === mode ? '' : 'none';
     });
   }
 
@@ -295,10 +229,6 @@ export function createBatchController(deps) {
     reader.onload = async event => {
       const urls = String(event.target.result || '').split('\n').map(line => line.trim()).filter(line => line.startsWith('http'));
       if (!urls.length) return showStatus(TEXT.batch.fileNoValidUrls, 'warn');
-      if ($('batchLinksInput')) {
-        $('batchLinksInput').value = urls.join('\n');
-        $('batchLinksInput').dispatchEvent(new Event('input', { bubbles: true }));
-      }
       await loadManualUrls(urls, 'file', file.name);
     };
     reader.readAsText(file, 'utf-8');
@@ -357,8 +287,6 @@ export function createBatchController(deps) {
             maxQuality: getMaxQualityFromInfo(info, current.maxQuality),
             videoId: info.videoId || current.videoId,
             platform: info.platform || current.platform,
-            uploadDate: info.uploadDate || current.uploadDate,
-            timestamp: info.timestamp || current.timestamp,
           };
           resolvedCount += 1;
         }
@@ -434,9 +362,6 @@ export function createBatchController(deps) {
     switchBatchSrc,
     loadLinksFromTextarea,
     loadLinksFromFile,
-    setTitleFilter,
-    setSortMode,
-    selectRange,
     showResultModal,
     closeResultModal,
     openResultFolder,

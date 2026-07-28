@@ -65,14 +65,13 @@ export function renderBatchList(container, videos, selectedIndexes, onToggle, fo
   }
 
   videos.forEach((video, index) => {
-    const sourceIndex = Number.isInteger(video._sourceIndex) ? video._sourceIndex : index;
-    const isSelected = selectedIndexes.has(sourceIndex);
+    const isSelected = selectedIndexes.has(index);
     const row = createNode('div', {
       className: `vi ${isSelected ? 'sel' : ''}`.trim(),
-      dataset: { idx: String(sourceIndex) },
+      dataset: { idx: String(index) },
     });
 
-    row.addEventListener('click', () => onToggle(sourceIndex));
+    row.addEventListener('click', () => onToggle(index));
 
     const checkbox = createNode('input', {
       className: 'vi-cb',
@@ -80,7 +79,7 @@ export function renderBatchList(container, videos, selectedIndexes, onToggle, fo
     });
     checkbox.checked = isSelected;
     checkbox.addEventListener('click', event => event.stopPropagation());
-    checkbox.addEventListener('change', () => onToggle(sourceIndex));
+    checkbox.addEventListener('change', () => onToggle(index));
 
     const thumbnail = createNode('img', {
       className: 'vi-thumb',

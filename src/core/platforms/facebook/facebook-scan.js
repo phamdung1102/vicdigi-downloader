@@ -7,35 +7,7 @@ const {
 } = require('./facebook-page-reels-scanner');
 
 function normalizeScanUrl(rawUrl) {
-  const normalized = normalizeFacebookUrl(rawUrl);
-  try {
-    const parsed = new URL(normalized);
-    const parts = parsed.pathname.split('/').filter(Boolean);
-    const profileId = parsed.pathname === '/profile.php'
-      ? String(parsed.searchParams.get('id') || '').trim()
-      : '';
-
-    if (profileId) {
-      const requestedTab = String(parsed.searchParams.get('sk') || '').trim();
-      parsed.search = '';
-      parsed.searchParams.set('id', profileId);
-      parsed.searchParams.set(
-        'sk',
-        /^(reels?|videos?)(?:_tab)?$/i.test(requestedTab) ? requestedTab : 'reels_tab',
-      );
-      return parsed.toString();
-    }
-
-    if (parts.length === 1 && !['reel', 'watch'].includes(parts[0].toLowerCase())) {
-      parsed.pathname = `/${parts[0]}/reels/`;
-      parsed.search = '';
-      return parsed.toString();
-    }
-
-    return parsed.toString();
-  } catch (_) {
-    return normalized;
-  }
+  return normalizeFacebookUrl(rawUrl);
 }
 
 function buildScanArgs(url, maxVideos) {

@@ -86,7 +86,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── Batch ─────────────────────────────────────────────────
   scanChannelVideos: (options) => invoke('scan-channel-videos', options),
   scanFacebookPage: (options) => invoke('scan-facebook-page', options),
-  scanFacebookPageReelsDedicated: (options) => invoke('scan-facebook-page-reels-dedicated', options),
   cancelFacebookScan: () => invoke('scan-facebook-cancel'),
   onFacebookUidsDiscovered: (callback) => {
     const wrapped = (_event, data) => callback(data);

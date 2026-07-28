@@ -134,15 +134,15 @@ const VIC = (() => {
     on('nav-history', 'click', () => switchTab('history'));
     on('nav-settings', 'click', openSettingsModal);
     on('nav-license', 'click', openLicenseModal);
-    on('srcTabUnified', 'click', () => switchBatchSrc('unified'));
+    on('srcTabChannel', 'click', () => switchBatchSrc('channel'));
     on('srcTabFacebook', 'click', () => switchBatchSrc('facebook'));
-    on('loadLinksBtn', 'click', scanVideos);
-    on('scanFacebookBtn', 'click', scanFacebookPageVideos);
+    on('srcTabLinks', 'click', () => switchBatchSrc('links'));
+    on('srcTabFile', 'click', () => switchBatchSrc('file'));
+    on('loadLinksBtn', 'click', loadLinksFromTextarea);
     on('facebookScanCancelBtn', 'click', cancelFacebookScan);
     on('batchFilePickerBtn', 'click', () => $('batchFileInput')?.click());
     on('batchSelectAllBtn', 'click', batchSelectAll);
     on('batchDeselectAllBtn', 'click', batchDeselectAll);
-    on('batchApplyRangeBtn', 'click', () => batchController?.selectRange?.($('batchRangeStart')?.value, $('batchRangeEnd')?.value));
     on('openDownloadCenterBtn', 'click', openDownloadCenterModal);
     on('refreshDownloadCenterBtn', 'click', refreshDownloadCenter);
     on('profileSelect', 'change', onProfileSelected);
@@ -179,10 +179,7 @@ const VIC = (() => {
     document.querySelectorAll('[data-preset]').forEach(button => {
       button.addEventListener('click', () => applyQuickPreset(button.dataset.preset));
     });
-    $('batchLinksInput')?.addEventListener('input', updateUnifiedBatchSourceHint);
-    $('batchTitleFilter')?.addEventListener('input', event => batchController?.setTitleFilter?.(event.target.value));
-    $('batchSort')?.addEventListener('change', event => batchController?.setSortMode?.(event.target.value));
-    $('batchQuality')?.addEventListener('change', () => batchController?.renderBatch?.());
+    $('batchLinksInput')?.addEventListener('input', () => $('linkCount').textContent = `${$('batchLinksInput').value.split('\n').filter(line => line.trim().startsWith('http')).length} URL`);
     $('batchFileInput')?.addEventListener('change', event => loadLinksFromFile(event.target));
     bindUiField('maxVideos', 'maxVideos', value => {
       const parsed = parseInt(value, 10);
@@ -862,11 +859,10 @@ const VIC = (() => {
     $(`tab-${tab}`)?.classList.add('active');
     $(`nav-${tab}`)?.classList.add('active');
     if (tab === 'batch') {
-      if ($('header-url-bar')) $('header-url-bar').style.display = 'none';
+      if ($('urlInput')) { $('urlInput').placeholder = TEXT.placeholders.batchUrl; $('urlInput').value = ''; }
       if ($('getInfoBtn')) $('getInfoBtn').style.display = 'none';
-      if ($('scanBtnHeader')) $('scanBtnHeader').style.display = 'none';
+      if ($('scanBtnHeader')) $('scanBtnHeader').style.display = 'inline-flex';
     } else {
-      if ($('header-url-bar')) $('header-url-bar').style.display = 'flex';
       if ($('urlInput')) $('urlInput').placeholder = TEXT.placeholders.singleUrl;
       if ($('getInfoBtn')) $('getInfoBtn').style.display = 'inline-flex';
       if ($('scanBtnHeader')) $('scanBtnHeader').style.display = 'none';
@@ -1101,23 +1097,18 @@ const VIC = (() => {
   async function scanVideos() {
     if (!ensureLicenseAccess('quet danh sach video')) return;
 
-    const sourceText = $('batchLinksInput')?.value.trim() || $('urlInput')?.value.trim() || '';
-    const urls = sourceText.split(/\r?\n/).map(line => line.trim()).filter(line => /^https?:\/\//i.test(line));
-    if (!urls.length) return showStatus('Vui lòng dán playlist, kênh hoặc liên kết video.', 'warn');
-    if (urls.length > 1) return loadLinksFromTextarea();
-    const url = urls[0];
-    if ($('urlInput')) $('urlInput').value = url;
+    const url = $('urlInput').value.trim();
+    if (!url) return showStatus('\u0056ui l\u00f2ng d\u00e1n URL k\u00eanh ho\u1eb7c playlist v\u00e0o \u00f4 tr\u00ean', 'warn');
 
-    if (isFacebookUrl(url)) {
+    if ((ui.batchSourceMode || 'channel') === 'facebook' || isFacebookUrl(url)) {
       switchBatchSrc('facebook');
-      if ($('facebookPageInput')) $('facebookPageInput').value = url;
-      return showStatus('Facebook đã được tách sang tab riêng. Nhấn “Quét Facebook” để bắt đầu.', 'info');
+      return scanFacebookPageVideos();
     }
 
     const maxVideos = parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos;
     await persistUi({ maxVideos });
-    $('loadLinksBtn').disabled = true;
-    $('loadLinksBtn').innerHTML = '<span class="spin"></span> Đang phân tích...';
+    $('scanBtnHeader').disabled = true;
+    $('scanBtnHeader').innerHTML = '<span class="spin"></span> \u0110ang qu\u00e9t...';
     batchSelected.clear();
     try {
       const result = await api?.scanChannelVideos?.({ url, maxVideos });
@@ -1129,21 +1120,9 @@ const VIC = (() => {
     } catch (error) {
       showStatus(error.message, 'err');
     } finally {
-      $('loadLinksBtn').disabled = false;
-      $('loadLinksBtn').textContent = 'Phân tích nguồn';
+      $('scanBtnHeader').disabled = false;
+      $('scanBtnHeader').innerHTML = '<span>QUÉT</span>';
     }
-  }
-
-  function updateUnifiedBatchSourceHint() {
-    const value = $('batchLinksInput')?.value || '';
-    const urls = value.split(/\r?\n/).map(line => line.trim()).filter(line => /^https?:\/\//i.test(line));
-    if ($('linkCount')) $('linkCount').textContent = `${urls.length} liên kết`;
-    if (!$('batchSourceType')) return;
-    if (!urls.length) $('batchSourceType').textContent = 'Tự nhận diện nguồn';
-    else if (urls.length > 1) $('batchSourceType').textContent = 'Danh sách nhiều liên kết';
-    else if (isFacebookUrl(urls[0])) $('batchSourceType').textContent = 'Facebook Page / Reels';
-    else if (/playlist|channel|\/@|\/c\/|\/user\//i.test(urls[0])) $('batchSourceType').textContent = 'Kênh hoặc danh sách phát';
-    else $('batchSourceType').textContent = 'Liên kết video';
   }
 
   function reelUrlFromFacebookUid(uid) {
@@ -1236,12 +1215,11 @@ const VIC = (() => {
 
   function setFacebookScanActive(isActive) {
     facebookScanActive = isActive;
-    if ($('scanFacebookBtn')) {
-      $('scanFacebookBtn').disabled = isActive;
-      $('scanFacebookBtn').innerHTML = isActive ? '<span class="spin"></span> Đang quét...' : 'Quét Facebook';
+    if ($('scanBtnHeader')) {
+      $('scanBtnHeader').disabled = isActive || (($('urlInput')?.value.trim() || '').length < 5);
+      $('scanBtnHeader').innerHTML = isActive ? '<span class="spin"></span> Đang quét...' : '<span>QUÉT</span>';
     }
     if ($('facebookScanCancelBtn')) $('facebookScanCancelBtn').disabled = !isActive;
-    renderBatch();
   }
 
   function updateFacebookScanMetrics(status = {}) {
@@ -1252,49 +1230,27 @@ const VIC = (() => {
   }
 
   async function scanFacebookPageVideos() {
-    const pageUrl = $('facebookPageInput')?.value.trim() || '';
+    const pageUrl = $('urlInput').value.trim();
     if (!pageUrl) return showStatus('Vui lòng dán URL Facebook Page/Reels vào ô trên', 'warn');
     if (!isFacebookUrl(pageUrl)) return showStatus('Nguồn Facebook Page/Reels chỉ nhận URL facebook.com', 'warn');
 
-    const maxVideos = Math.min(parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos, 200);
-    if ($('maxVideos')) $('maxVideos').value = String(maxVideos);
+    const maxVideos = parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos;
     await persistUi({ maxVideos, batchSourceMode: 'facebook' });
+    resetFacebookMetadataResolver();
+    facebookScanUids = new Set();
     batchVideos = [];
     batchSelected.clear();
     renderBatch();
     $('videoListSection').style.display = 'block';
-    updateFacebookScanMetrics({ state: 'Đang quét bằng VIC ScanVideo', found: 0, domScanCount: 0, elapsedSeconds: 0 });
+    updateFacebookScanMetrics({ state: 'Đang khởi động', found: 0, domScanCount: 0, elapsedSeconds: 0 });
     setFacebookScanActive(true);
-    if ($('facebookScanCancelBtn')) $('facebookScanCancelBtn').style.display = 'none';
-    showStatus(`Đang mở Facebook và gom tối đa ${maxVideos} video...`, 'info');
+    showStatus('Đang quét Facebook bằng trình duyệt ẩn...', 'info');
 
-    const startedAt = Date.now();
-    const elapsedTimer = setInterval(() => {
-      updateFacebookScanMetrics({
-        state: 'Đang cuộn và gom video',
-        found: batchVideos.length,
-        elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
-      });
-    }, 1000);
-
-    try {
-      const result = await api?.scanFacebookPageReelsDedicated?.({ url: pageUrl, maxVideos });
-      batchVideos = Array.isArray(result?.videos) ? result.videos : [];
-      batchSelected = new Set(batchVideos.map((_, index) => index));
-      renderBatch();
-      updateFacebookScanMetrics({
-        state: 'Hoàn tất',
-        found: batchVideos.length,
-        elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
-      });
-      showStatus(`Quét xong, tìm thấy ${batchVideos.length}/${maxVideos} video Facebook.`, batchVideos.length ? 'ok' : 'warn');
-    } catch (error) {
-      updateFacebookScanMetrics({ state: 'Lỗi', found: 0 });
-      showStatus(error?.message || 'Không thể quét Facebook', 'err');
-    } finally {
-      clearInterval(elapsedTimer);
+    const result = await api?.scanFacebookPage?.({ pageUrl, maxVideos });
+    if (!result?.success) {
       setFacebookScanActive(false);
-      if ($('facebookScanCancelBtn')) $('facebookScanCancelBtn').style.display = '';
+      updateFacebookScanMetrics({ state: 'Lỗi', found: facebookScanUids.size });
+      showStatus(result?.error || 'Không thể bắt đầu quét Facebook', 'err');
     }
   }
 
@@ -1456,9 +1412,6 @@ const VIC = (() => {
     getBatchSourceMode: () => ui.batchSourceMode || 'channel',
     showStatus,
     ensureBatchAccess: () => ensureLicenseAccess('tai hang loat'),
-    getBatchScanTarget: () => facebookScanActive
-      ? Math.min(parseInt($('maxVideos')?.value, 10) || DEFAULTS.maxVideos, 200)
-      : 0,
   });
 
   updateController = createUpdateController({

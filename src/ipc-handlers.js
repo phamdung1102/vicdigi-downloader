@@ -13,10 +13,6 @@ const { downloadVideo, downloadSubtitle, downloadThumbnail } = require('./downlo
 const { scanChannelVideos } = require('./core/media/scan-service');
 const { startDomScanner } = require('./core/facebook/fb-dom-scanner');
 const {
-  normalizeScanUrl: normalizeFacebookScanUrl,
-  scanChannelVideos: scanFacebookCollection,
-} = require('./core/platforms/facebook/facebook-scan');
-const {
   deleteCustomProfile,
   getDownloadProfiles,
   saveCustomProfile,
@@ -356,19 +352,6 @@ function _stopActiveFacebookScan(reason = 'replaced') {
 }
 
 function _registerFacebookScanner() {
-  ipcMain.handle('scan-facebook-page-reels-dedicated', async (_event, payload = {}) => {
-    _requireLicense();
-    const url = normalizeFacebookScanUrl(payload.url);
-    const result = await scanFacebookCollection({
-      url,
-      maxVideos: Number.isFinite(payload.maxVideos) ? payload.maxVideos : 20,
-      waitAfterLoadMs: 2200,
-      scrollPauseMs: 1100,
-    });
-    if (!result) throw new Error('Không nhận diện được trang Facebook Reels/Videos từ URL này.');
-    return result;
-  });
-
   ipcMain.handle('scan-facebook-page', async (_event, payload = {}) => {
     _requireLicense();
     _stopActiveFacebookScan('replaced');

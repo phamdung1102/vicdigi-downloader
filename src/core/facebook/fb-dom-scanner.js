@@ -464,7 +464,6 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
   let stopped = false;
   let domScanCount = 0;
   let scrollCount = 0;
-  let scrollInFlight = false;
   let paginationCount = 0;
   let stableRounds = 0;
   let bestCount = 0;
@@ -707,73 +706,6 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
     }
   }
 
-  async function dismissBlockingLoginDialog() {
-    if (stopped || scanWin.isDestroyed() || webContents.isDestroyed()) return false;
-
-    try {
-      const target = await webContents.executeJavaScript(
-        `(() => {
-          const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'));
-          for (const dialog of dialogs) {
-            const text = String(dialog.textContent || '');
-            const isLoginWall =
-              /log in|see more on facebook|đăng nhập|xem thêm trên facebook/i.test(text) ||
-              Boolean(dialog.querySelector('input[type="password"]'));
-            if (!isLoginWall) continue;
-
-            const buttons = Array.from(dialog.querySelectorAll('button,[role="button"]'));
-            const closeButton = buttons.find(button => {
-              const label = String(button.getAttribute('aria-label') || button.textContent || '').trim();
-              return /^(close|đóng|fechar|cerrar|schließen|fermer|chiudi|x)$/i.test(label);
-            });
-            if (!closeButton) return { found: true, x: 0, y: 0 };
-            const rect = closeButton.getBoundingClientRect();
-            closeButton.click();
-            return {
-              found: true,
-              x: Math.round(rect.left + rect.width / 2),
-              y: Math.round(rect.top + rect.height / 2)
-            };
-          }
-          return { found: false, x: 0, y: 0 };
-        })();`,
-        true
-      );
-
-      if (target?.found) {
-        if (target.x > 0 && target.y > 0) {
-          webContents.sendInputEvent({ type: 'mouseMove', x: target.x, y: target.y });
-          webContents.sendInputEvent({ type: 'mouseDown', x: target.x, y: target.y, button: 'left', clickCount: 1 });
-          webContents.sendInputEvent({ type: 'mouseUp', x: target.x, y: target.y, button: 'left', clickCount: 1 });
-        }
-        await new Promise(resolve => setTimeout(resolve, 350));
-        await webContents.executeJavaScript(
-          `(() => {
-            const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'));
-            for (const dialog of dialogs) {
-              const text = String(dialog.textContent || '');
-              if (
-                /log in|see more on facebook|đăng nhập|xem thêm trên facebook/i.test(text) ||
-                dialog.querySelector('input[type="password"]')
-              ) {
-                dialog.remove();
-              }
-            }
-            document.body && document.body.style.setProperty('overflow', 'auto', 'important');
-            document.documentElement.style.setProperty('overflow-y', 'auto', 'important');
-            return true;
-          })();`,
-          true
-        );
-        sendScannerStatus({ state: 'login-dialog-dismissed' });
-      }
-      return Boolean(target?.found);
-    } catch (error) {
-      sendScannerStatus({ state: 'dialog-dismiss-error', error: error.message });
-      return false;
-    }
-  }
-
   async function ensurePaginationQueryId() {
     if (paginationQueryId || stopped || webContents.isDestroyed()) {
       return paginationQueryId;
@@ -921,13 +853,11 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
   }
 
   async function runScroll() {
-    if (scrollInFlight || stopped || scanWin.isDestroyed() || webContents.isDestroyed()) {
+    if (stopped || scanWin.isDestroyed() || webContents.isDestroyed()) {
       return;
     }
 
-    scrollInFlight = true;
     try {
-      await dismissBlockingLoginDialog();
       await runDomScan();
       await runPaginationFetch();
       if (stopped) {
@@ -939,7 +869,7 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
       webContents.sendInputEvent({ type: 'keyDown', keyCode: 'PageDown' });
       webContents.sendInputEvent({ type: 'keyUp', keyCode: 'PageDown' });
 
-      const scrollResult = await webContents.executeJavaScript(
+      await webContents.executeJavaScript(
         `(() => {
           const beforeY = window.scrollY || document.documentElement.scrollTop || 0;
           const deltas = [
@@ -994,14 +924,11 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
         true
       );
       scrollCount += 1;
-      sendScannerStatus({ state: 'scroll', scroll: scrollResult });
       await new Promise((resolve) => setTimeout(resolve, 420));
       await runDomScan();
       await runPaginationFetch();
     } catch (error) {
       sendScannerStatus({ state: 'scroll-error', error: error.message });
-    } finally {
-      scrollInFlight = false;
     }
   }
 
@@ -1036,7 +963,6 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
 }
 
 module.exports = {
-  collectVideoIdsFromText,
   normalizeMaxVideos,
   normalizeFacebookUrl,
   startDomScanner
