@@ -980,9 +980,21 @@ const VIC = (() => {
     try {
       const result = await api?.scanChannelVideos?.({ url, maxVideos });
       batchVideos = result?.videos || [];
+      batchSelected = new Set(batchVideos.map((_, index) => index));
       renderBatch();
       $('videoListSection').style.display = 'block';
-      showStatus(result?.partial ? `Kh\u00f4i ph\u1ee5c \u0111\u01b0\u1ee3c ${batchVideos.length} video t\u1eeb k\u1ebft qu\u1ea3 qu\u00e9t m\u1ed9t ph\u1ea7n` : `T\u00ecm th\u1ea5y ${batchVideos.length} video`, result?.partial ? 'warn' : 'ok');
+      if (result?.source === 'hongguo') {
+        const total = Number(result.totalFound) || batchVideos.length;
+        const accessible = Number(result.accessibleCount) || batchVideos.length;
+        const limitedByInput = batchVideos.length < accessible;
+        const suffix = limitedByInput ? `; đang hiển thị ${batchVideos.length} theo giới hạn quét` : '';
+        showStatus(
+          `Bộ “${result.seriesTitle || 'Hongguo'}”: tải được ${accessible}/${total} tập công khai${suffix}. Đã chọn sẵn tất cả.`,
+          accessible < total ? 'warn' : 'ok',
+        );
+      } else {
+        showStatus(result?.partial ? `Kh\u00f4i ph\u1ee5c \u0111\u01b0\u1ee3c ${batchVideos.length} video t\u1eeb k\u1ebft qu\u1ea3 qu\u00e9t m\u1ed9t ph\u1ea7n` : `T\u00ecm th\u1ea5y ${batchVideos.length} video`, result?.partial ? 'warn' : 'ok');
+      }
     } catch (error) {
       showStatus(error.message, 'err');
     } finally {

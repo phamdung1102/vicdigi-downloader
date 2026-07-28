@@ -69,12 +69,10 @@ win:
       arch:
         - x64
   icon: assets/icon.ico
-  publisherName: "VICdigi"
 
 nsis:
-  oneClick: false
+  oneClick: true
   perMachine: false
-  allowToChangeInstallationDirectory: true
   allowElevation: true
   installerIcon: assets/icon.ico
   uninstallerIcon: assets/icon.ico

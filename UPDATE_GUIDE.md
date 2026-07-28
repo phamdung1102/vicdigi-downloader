@@ -8,6 +8,8 @@ App dùng `electron-updater` + **GitHub Releases**. Bản Setup đã cài trên 
 - Repo này **chỉ chứa file cài đặt** — source code KHÔNG đưa lên GitHub (giữ ở máy, quản lý bằng git local).
 - Token GitHub lấy tự động từ `gh` CLI (đã đăng nhập tài khoản phamdung1102 trên máy này).
 - `releaseType: release` trong `electron-builder.yml` → đăng lên là khách nhận được ngay, không cần vào GitHub bấm gì thêm.
+- Bộ cài hiện chưa ký số, vì vậy không cấu hình `win.publisherName`; nếu khai báo
+  publisher mà không ký installer, `electron-updater` sẽ từ chối bản cập nhật.
 
 ## Phát hành bản mới — chỉ 2 bước
 

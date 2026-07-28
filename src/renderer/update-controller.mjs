@@ -21,8 +21,8 @@ export function createUpdateController(deps) {
   }
 
   function applyUpdateCheckResult(result) {
-    $('localVerEl').textContent = result.localVersion || TEXT.update.localMissing;
-    $('latestVerEl').textContent = result.latestVersion || '-';
+    $('localVerEl').textContent = result.isInstalled ? 'Đang sử dụng' : TEXT.update.localMissing;
+    $('latestVerEl').textContent = result.hasUpdate ? 'Sẵn sàng' : 'Đã cập nhật';
     if (result.hasUpdate) {
       $('updateTitle').textContent = TEXT.update.hasUpdate;
       $('updateDoBtn').style.display = 'inline-flex';
@@ -58,7 +58,7 @@ export function createUpdateController(deps) {
     $('updateProgress').classList.remove('show');
     $('updateSkipBtn').textContent = TEXT.update.close;
     $('updateTitle').textContent = TEXT.update.title;
-    $('updateSub').textContent = 'yt-dlp engine';
+    $('updateSub').textContent = 'Tối ưu khả năng tải và tương thích';
     try {
       const result = prefetchedResult || await api.checkYtdlpUpdate();
       applyUpdateCheckResult(result);

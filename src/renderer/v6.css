@@ -947,6 +947,13 @@ select.field {
   overflow: auto;
 }
 
+.modal-settings {
+  width: min(680px, 94vw);
+  max-height: 88vh;
+  overflow: auto;
+  gap: 13px;
+}
+
 .modal-head {
   display: flex; align-items: center; gap: 11px;
 }
@@ -984,9 +991,42 @@ select.field {
 .modal-footer { display:flex;gap:8px;justify-content:flex-end }
 
 .settings-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-card {
+  min-width: 0;
+  padding: 12px 13px;
+  border-radius: 10px;
+  justify-content: center;
+}
+
+.settings-card .field-wrap {
+  gap: 6px;
+}
+
+.settings-card .field {
+  min-height: 32px;
+}
+
+.settings-card .settings-note {
+  margin-top: 5px;
+  line-height: 1.45;
+}
+
+.settings-card .dc-toolbar {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-card .folder-row {
+  gap: 6px;
+}
+
+.settings-card .btn-sm {
+  min-height: 30px;
 }
 
 .settings-row {
@@ -1083,6 +1123,10 @@ select.field {
   .settings-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .settings-stack {
+    grid-template-columns: 1fr;
   }
 
   .header {

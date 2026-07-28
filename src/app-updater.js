@@ -59,14 +59,15 @@ function setupAutoUpdater(mainWindow) {
     sendStatus('downloaded', { version: info?.version });
     const { response } = await dialog.showMessageBox(mainWindow, {
       type: 'info',
-      title: 'Cập nhật VICdigi Downloader',
-      message: `Đã tải xong bản ${info?.version || 'mới'}.`,
-      detail: 'Khởi động lại ngay để cài đặt, hoặc bản mới sẽ tự cài khi bạn đóng app.',
-      buttons: ['Khởi động lại ngay', 'Để sau'],
+      title: 'Phiên bản VICdigi Downloader mới',
+      message: `VICdigi Downloader ${info?.version ? `v${info.version}` : 'phiên bản mới'} đã sẵn sàng.`,
+      detail: 'Bản cập nhật ứng dụng đã được tải xong. Khởi động lại để sử dụng các tính năng và cải tiến mới.',
+      buttons: ['Cập nhật và khởi động lại', 'Để sau'],
       defaultId: 0,
       cancelId: 1,
     });
-    if (response === 0) autoUpdater.quitAndInstall();
+    // Cài im lặng và tự mở lại app: người dùng chỉ cần xác nhận một lần.
+    if (response === 0) autoUpdater.quitAndInstall(true, true);
   });
 
   const check = () => {

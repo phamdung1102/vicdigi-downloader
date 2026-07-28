@@ -24,7 +24,7 @@
     <div class="header-url-bar">
       <span class="url-icon" id="urlIcon">🔗</span>
       <input id="urlInput" type="text"
-        placeholder="Dán URL: YouTube · TikTok · Instagram · Facebook · Vimeo · magnet · .torrent…"
+        placeholder="Dán URL: YouTube · TikTok · Instagram · Facebook · Hongguo · Vimeo · magnet · .torrent…"
         autocomplete="off" spellcheck="false" />
       <!-- Nút Lấy thông tin (tab single) -->
       <button class="btn-info-sm" id="getInfoBtn" disabled>
@@ -429,7 +429,7 @@
      SETTINGS MODAL
 ══════════════════════════════════════════════════════════ -->
 <div class="overlay" id="settingsOverlay">
-  <div class="modal">
+  <div class="modal modal-settings">
     <div class="modal-head">
       <div class="modal-icon">⚙️</div>
       <div>
@@ -440,7 +440,7 @@
     </div>
 
     <div class="settings-stack">
-      <div class="ver-box">
+      <div class="ver-box settings-card">
         <div class="field-wrap">
           <label class="field-label" for="parallelDownloads">Luồng tải liên tục</label>
           <div class="settings-row">
@@ -461,7 +461,7 @@
         </div>
       </div>
 
-      <div class="ver-box">
+      <div class="ver-box settings-card">
         <div class="field-wrap">
           <label class="field-label" for="profileSelect">Mẫu cấu hình tải</label>
           <select class="field" id="profileSelect">
@@ -486,7 +486,7 @@
         </div>
       </div>
 
-      <div class="ver-box">
+      <div class="ver-box settings-card">
         <div class="field-wrap">
           <label class="field-label" for="socialCookiePath">Cookies.txt cho mạng xã hội</label>
           <div class="folder-row">
@@ -500,14 +500,14 @@
         </div>
       </div>
 
-      <div class="ver-box">
+      <div class="ver-box settings-card">
         <div class="settings-row">
           <div>
-          <div class="field-label">Bộ máy yt-dlp</div>
-          <div class="settings-note">Kiểm tra phiên bản hoặc cập nhật bộ máy tải video khi cần.</div>
+          <div class="field-label">Thành phần hệ thống</div>
+          <div class="settings-note">Kiểm tra và cập nhật các thành phần hỗ trợ tải xuống.</div>
             <div class="settings-note" id="persistenceStatusText">Persistence: đang kiểm tra…</div>
           </div>
-          <button class="btn btn-primary btn-sm" id="openUpdateBtn">Kiểm tra yt-dlp</button>
+          <button class="btn btn-primary btn-sm" id="openUpdateBtn">Kiểm tra hệ thống</button>
         </div>
       </div>
     </div>
@@ -637,20 +637,20 @@
     <div class="modal-head">
       <div class="modal-icon">⬆️</div>
       <div>
-        <div class="modal-title" id="updateTitle">Kiểm tra cập nhật</div>
-        <div class="modal-sub" id="updateSub">Bộ máy yt-dlp</div>
+        <div class="modal-title" id="updateTitle">Cập nhật hệ thống</div>
+        <div class="modal-sub" id="updateSub">Tối ưu khả năng tải và tương thích</div>
       </div>
       <button class="modal-close" id="updateCloseBtn">✕</button>
     </div>
 
     <div class="ver-box">
       <div class="ver-row">
-        <span class="ver-label">Hiện tại</span>
+        <span class="ver-label">Trạng thái</span>
         <span class="ver-val" id="localVerEl">—</span>
       </div>
       <div class="ver-divider"></div>
       <div class="ver-row">
-        <span class="ver-label">Mới nhất</span>
+        <span class="ver-label">Cập nhật</span>
         <span class="ver-val new" id="latestVerEl">—</span>
       </div>
     </div>
@@ -658,7 +658,7 @@
     <!-- Update progress -->
     <div class="progress-wrap" id="updateProgress">
       <div class="progress-head">
-        <span class="progress-label">Đang tải yt-dlp mới…</span>
+        <span class="progress-label">Đang cập nhật thành phần hệ thống…</span>
         <span class="progress-pct" id="updatePct">0%</span>
       </div>
       <div class="progress-track">
@@ -728,5 +728,3 @@
 
 </body>
 </html>
-
-

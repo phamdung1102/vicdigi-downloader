@@ -99,7 +99,7 @@ function _registerVideo() {
     const platform = DownloadManager.detectPlatform(url);
 
     // Social platforms → queue via Download Manager
-    if (['instagram', 'facebook', 'tiktok', 'torrent'].includes(platform)) {
+    if (['instagram', 'facebook', 'tiktok', 'hongguo', 'torrent'].includes(platform)) {
       if (!_dlManager) throw new Error('Download Manager not ready');
       return _runManagedDownload(event, {
         url,
@@ -414,5 +414,4 @@ function setMainWindow(win) { _mainWindow = win; }
 function updateCaps(newCaps) { Object.assign(_caps, newCaps); }
 
 module.exports = { registerAll, setMainWindow, updateCaps };
-
 
