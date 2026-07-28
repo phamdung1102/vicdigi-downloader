@@ -1099,6 +1099,21 @@ const VIC = (() => {
     }
   }
 
+  function toFacebookCollectionUrl(rawUrl) {
+    try {
+      const parsed = new URL(String(rawUrl || '').trim());
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      if (/^(reels|videos)$/i.test(parts[1] || '')) return parsed.toString();
+      if (parts[0] && parts[0] !== 'reel' && parts[0] !== 'watch') {
+        parsed.pathname = `/${parts[0]}/reels/`;
+        parsed.search = '';
+      }
+      return parsed.toString();
+    } catch (_) {
+      return rawUrl;
+    }
+  }
+
   async function scanVideos() {
     if (!ensureLicenseAccess('quet danh sach video')) return;
 
@@ -1109,18 +1124,18 @@ const VIC = (() => {
     const url = urls[0];
     if ($('urlInput')) $('urlInput').value = url;
 
-    if (isFacebookUrl(url)) {
-      switchBatchSrc('facebook');
-      return scanFacebookPageVideos();
-    }
-
-    const maxVideos = parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos;
+    const isFacebook = isFacebookUrl(url);
+    const maxVideos = Math.min(
+      parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos,
+      isFacebook ? 200 : MAX_BATCH_VIDEOS,
+    );
+    const scanUrl = isFacebook ? toFacebookCollectionUrl(url) : url;
     await persistUi({ maxVideos });
     $('loadLinksBtn').disabled = true;
     $('loadLinksBtn').innerHTML = '<span class="spin"></span> Đang phân tích...';
     batchSelected.clear();
     try {
-      const result = await api?.scanChannelVideos?.({ url, maxVideos });
+      const result = await api?.scanChannelVideos?.({ url: scanUrl, maxVideos });
       batchVideos = result?.videos || [];
       batchSelected = new Set(batchVideos.map((_, index) => index));
       renderBatch();
