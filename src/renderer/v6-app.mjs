@@ -138,11 +138,12 @@ const VIC = (() => {
     on('srcTabFacebook', 'click', () => switchBatchSrc('facebook'));
     on('srcTabLinks', 'click', () => switchBatchSrc('links'));
     on('srcTabFile', 'click', () => switchBatchSrc('file'));
-    on('loadLinksBtn', 'click', loadLinksFromTextarea);
+    on('loadLinksBtn', 'click', scanVideos);
     on('facebookScanCancelBtn', 'click', cancelFacebookScan);
     on('batchFilePickerBtn', 'click', () => $('batchFileInput')?.click());
     on('batchSelectAllBtn', 'click', batchSelectAll);
     on('batchDeselectAllBtn', 'click', batchDeselectAll);
+    on('batchApplyRangeBtn', 'click', () => batchController?.selectRange?.($('batchRangeStart')?.value, $('batchRangeEnd')?.value));
     on('openDownloadCenterBtn', 'click', openDownloadCenterModal);
     on('refreshDownloadCenterBtn', 'click', refreshDownloadCenter);
     on('profileSelect', 'change', onProfileSelected);
@@ -179,7 +180,10 @@ const VIC = (() => {
     document.querySelectorAll('[data-preset]').forEach(button => {
       button.addEventListener('click', () => applyQuickPreset(button.dataset.preset));
     });
-    $('batchLinksInput')?.addEventListener('input', () => $('linkCount').textContent = `${$('batchLinksInput').value.split('\n').filter(line => line.trim().startsWith('http')).length} URL`);
+    $('batchLinksInput')?.addEventListener('input', updateUnifiedBatchSourceHint);
+    $('batchTitleFilter')?.addEventListener('input', event => batchController?.setTitleFilter?.(event.target.value));
+    $('batchSort')?.addEventListener('change', event => batchController?.setSortMode?.(event.target.value));
+    $('batchQuality')?.addEventListener('change', () => batchController?.renderBatch?.());
     $('batchFileInput')?.addEventListener('change', event => loadLinksFromFile(event.target));
     bindUiField('maxVideos', 'maxVideos', value => {
       const parsed = parseInt(value, 10);
@@ -859,10 +863,11 @@ const VIC = (() => {
     $(`tab-${tab}`)?.classList.add('active');
     $(`nav-${tab}`)?.classList.add('active');
     if (tab === 'batch') {
-      if ($('urlInput')) { $('urlInput').placeholder = TEXT.placeholders.batchUrl; $('urlInput').value = ''; }
+      if ($('header-url-bar')) $('header-url-bar').style.display = 'none';
       if ($('getInfoBtn')) $('getInfoBtn').style.display = 'none';
-      if ($('scanBtnHeader')) $('scanBtnHeader').style.display = 'inline-flex';
+      if ($('scanBtnHeader')) $('scanBtnHeader').style.display = 'none';
     } else {
+      if ($('header-url-bar')) $('header-url-bar').style.display = 'flex';
       if ($('urlInput')) $('urlInput').placeholder = TEXT.placeholders.singleUrl;
       if ($('getInfoBtn')) $('getInfoBtn').style.display = 'inline-flex';
       if ($('scanBtnHeader')) $('scanBtnHeader').style.display = 'none';
@@ -1097,18 +1102,22 @@ const VIC = (() => {
   async function scanVideos() {
     if (!ensureLicenseAccess('quet danh sach video')) return;
 
-    const url = $('urlInput').value.trim();
-    if (!url) return showStatus('\u0056ui l\u00f2ng d\u00e1n URL k\u00eanh ho\u1eb7c playlist v\u00e0o \u00f4 tr\u00ean', 'warn');
+    const sourceText = $('batchLinksInput')?.value.trim() || $('urlInput')?.value.trim() || '';
+    const urls = sourceText.split(/\r?\n/).map(line => line.trim()).filter(line => /^https?:\/\//i.test(line));
+    if (!urls.length) return showStatus('Vui lòng dán playlist, kênh hoặc liên kết video.', 'warn');
+    if (urls.length > 1) return loadLinksFromTextarea();
+    const url = urls[0];
+    if ($('urlInput')) $('urlInput').value = url;
 
-    if ((ui.batchSourceMode || 'channel') === 'facebook' || isFacebookUrl(url)) {
+    if (isFacebookUrl(url)) {
       switchBatchSrc('facebook');
       return scanFacebookPageVideos();
     }
 
     const maxVideos = parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos;
     await persistUi({ maxVideos });
-    $('scanBtnHeader').disabled = true;
-    $('scanBtnHeader').innerHTML = '<span class="spin"></span> \u0110ang qu\u00e9t...';
+    $('loadLinksBtn').disabled = true;
+    $('loadLinksBtn').innerHTML = '<span class="spin"></span> Đang phân tích...';
     batchSelected.clear();
     try {
       const result = await api?.scanChannelVideos?.({ url, maxVideos });
@@ -1120,9 +1129,21 @@ const VIC = (() => {
     } catch (error) {
       showStatus(error.message, 'err');
     } finally {
-      $('scanBtnHeader').disabled = false;
-      $('scanBtnHeader').innerHTML = '<span>QUÉT</span>';
+      $('loadLinksBtn').disabled = false;
+      $('loadLinksBtn').textContent = 'Phân tích nguồn';
     }
+  }
+
+  function updateUnifiedBatchSourceHint() {
+    const value = $('batchLinksInput')?.value || '';
+    const urls = value.split(/\r?\n/).map(line => line.trim()).filter(line => /^https?:\/\//i.test(line));
+    if ($('linkCount')) $('linkCount').textContent = `${urls.length} liên kết`;
+    if (!$('batchSourceType')) return;
+    if (!urls.length) $('batchSourceType').textContent = 'Tự nhận diện nguồn';
+    else if (urls.length > 1) $('batchSourceType').textContent = 'Danh sách nhiều liên kết';
+    else if (isFacebookUrl(urls[0])) $('batchSourceType').textContent = 'Facebook Page / Reels';
+    else if (/playlist|channel|\/@|\/c\/|\/user\//i.test(urls[0])) $('batchSourceType').textContent = 'Kênh hoặc danh sách phát';
+    else $('batchSourceType').textContent = 'Liên kết video';
   }
 
   function reelUrlFromFacebookUid(uid) {
@@ -1230,7 +1251,7 @@ const VIC = (() => {
   }
 
   async function scanFacebookPageVideos() {
-    const pageUrl = $('urlInput').value.trim();
+    const pageUrl = $('batchLinksInput')?.value.trim() || $('urlInput').value.trim();
     if (!pageUrl) return showStatus('Vui lòng dán URL Facebook Page/Reels vào ô trên', 'warn');
     if (!isFacebookUrl(pageUrl)) return showStatus('Nguồn Facebook Page/Reels chỉ nhận URL facebook.com', 'warn');
 

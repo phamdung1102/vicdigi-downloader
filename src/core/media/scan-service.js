@@ -20,6 +20,8 @@ function parsePlaylistDump(stdout, maxVideos = 10) {
           videoId,
           author: item.uploader || item.channel || item.playlist_title || 'Unknown',
           duration: item.duration || 0,
+          uploadDate: item.upload_date || item.release_date || '',
+          timestamp: item.timestamp || item.release_timestamp || 0,
           views: item.view_count || 0,
           thumbnail: pickThumbnail(item, videoId, platform),
           maxQuality: 720,

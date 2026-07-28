@@ -137,8 +137,7 @@ body {
 
 /* header url bar */
 .header-url-bar {
-  flex: 1;
-  max-width: 560px;
+  width: min(760px, 78vw);
   display: flex;
   align-items: center;
   background: var(--s2);
@@ -829,6 +828,79 @@ select.field {
   opacity: .48;
   cursor: grabbing;
 }
+
+.nav-icon,
+.modal-icon,
+.empty-icon {
+  display: none;
+}
+
+.batch-source-card {
+  border-color: var(--accent-border);
+  box-shadow: 0 8px 28px rgba(0,0,0,.12);
+}
+
+.batch-source-input {
+  min-height: 116px;
+  resize: vertical;
+  padding: 13px 14px;
+  font: 12px/1.65 'Cascadia Code','Consolas',monospace;
+}
+
+.batch-source-actions,
+.batch-source-actions > div,
+.batch-tools,
+.batch-estimate,
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-source-actions {
+  justify-content: space-between;
+  margin-top: 9px;
+}
+
+.batch-source-actions > div:first-child {
+  color: var(--txt-lo);
+  font-size: 11px;
+}
+
+#batchSourceType {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.batch-tools {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(150px, .55fr);
+  margin-bottom: 8px;
+}
+
+.range-inputs .field {
+  width: 68px;
+}
+
+.batch-estimate {
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--s2);
+  color: var(--txt-mid);
+  font-size: 11px;
+}
+
+.batch-estimate span + span::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  margin-right: 8px;
+  background: var(--border-hi);
+  vertical-align: -2px;
+}
 .dc-row-progress {
   width: min(360px, 100%);
   height: 4px;
@@ -861,7 +933,7 @@ select.field {
 .dc-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   padding: 11px 12px;
   border: 1px solid var(--border);
