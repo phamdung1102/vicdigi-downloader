@@ -483,9 +483,40 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
   let paginationQueryName = PAGINATION_QUERY_NAMES[0];
   let collectionToken = '';
   let nextCursor = '';
+  let observedPaginationQueryId = '';
+  let observedPaginationQueryName = '';
   let activeCandidateIndex = 0;
   let activePageUrl = candidateUrls[0] || pageUrl;
   const seenCursors = new Set();
+
+  const graphqlFilter = { urls: ['*://*.facebook.com/api/graphql/*'] };
+  const observeGraphqlRequest = (details, callback) => {
+    try {
+      const chunks = (details.uploadData || [])
+        .map(item => item?.bytes ? Buffer.from(item.bytes) : null)
+        .filter(Boolean);
+      const body = Buffer.concat(chunks).toString('utf8');
+      const params = new URLSearchParams(body);
+      const queryId = params.get('doc_id') || '';
+      const queryName = params.get('fb_api_req_friendly_name') || '';
+      const variables = params.get('variables') || '';
+      const isCollectionPagination =
+        /AppCollection.*(?:Reels|Videos).*Pagination/i.test(queryName) ||
+        (/YXBwX2NvbGxlY3Rpb246/.test(variables) && /(?:cursor|count)/i.test(variables));
+
+      if (queryId && isCollectionPagination) {
+        observedPaginationQueryId = queryId;
+        observedPaginationQueryName = queryName || PAGINATION_QUERY_NAMES[0];
+        paginationQueryId = queryId;
+        paginationQueryName = observedPaginationQueryName;
+        sendScannerStatus({ state: 'pagination-query-captured', queryName: paginationQueryName });
+      }
+    } catch (_) {
+      // Request observation is best-effort; never block Facebook navigation.
+    }
+    if (typeof callback === 'function') callback({});
+  };
+  webContents.session.webRequest.onBeforeRequest(graphqlFilter, observeGraphqlRequest);
 
   function buildStatus(payload = {}) {
     return {
@@ -518,6 +549,7 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
     clearTimeout(firstScanTimeout);
     clearTimeout(scanTimeout);
     clearTimeout(noUidTimeout);
+    webContents.session.webRequest.onBeforeRequest(graphqlFilter, null);
     destroyWindow(scanWin);
     sendScannerStatus({ state: 'stopped', reason });
   }
@@ -534,8 +566,8 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
   }
 
   function resetRouteState() {
-    paginationQueryId = '';
-    paginationQueryName = PAGINATION_QUERY_NAMES[0];
+    paginationQueryId = observedPaginationQueryId;
+    paginationQueryName = observedPaginationQueryName || PAGINATION_QUERY_NAMES[0];
     collectionToken = '';
     nextCursor = '';
     seenCursors.clear();
