@@ -1259,21 +1259,42 @@ const VIC = (() => {
     const maxVideos = Math.min(parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos, 200);
     if ($('maxVideos')) $('maxVideos').value = String(maxVideos);
     await persistUi({ maxVideos, batchSourceMode: 'facebook' });
-    resetFacebookMetadataResolver();
-    facebookScanUids = new Set();
     batchVideos = [];
     batchSelected.clear();
     renderBatch();
     $('videoListSection').style.display = 'block';
-    updateFacebookScanMetrics({ state: 'Đang khởi động', found: 0, domScanCount: 0, elapsedSeconds: 0 });
+    updateFacebookScanMetrics({ state: 'Đang quét bằng VIC ScanVideo', found: 0, domScanCount: 0, elapsedSeconds: 0 });
     setFacebookScanActive(true);
-    showStatus('Đang quét Facebook bằng trình duyệt ẩn...', 'info');
+    if ($('facebookScanCancelBtn')) $('facebookScanCancelBtn').style.display = 'none';
+    showStatus(`Đang mở Facebook và gom tối đa ${maxVideos} video...`, 'info');
 
-    const result = await api?.scanFacebookPage?.({ pageUrl, maxVideos });
-    if (!result?.success) {
+    const startedAt = Date.now();
+    const elapsedTimer = setInterval(() => {
+      updateFacebookScanMetrics({
+        state: 'Đang cuộn và gom video',
+        found: batchVideos.length,
+        elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+      });
+    }, 1000);
+
+    try {
+      const result = await api?.scanFacebookPageReelsDedicated?.({ url: pageUrl, maxVideos });
+      batchVideos = Array.isArray(result?.videos) ? result.videos : [];
+      batchSelected = new Set(batchVideos.map((_, index) => index));
+      renderBatch();
+      updateFacebookScanMetrics({
+        state: 'Hoàn tất',
+        found: batchVideos.length,
+        elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+      });
+      showStatus(`Quét xong, tìm thấy ${batchVideos.length}/${maxVideos} video Facebook.`, batchVideos.length ? 'ok' : 'warn');
+    } catch (error) {
+      updateFacebookScanMetrics({ state: 'Lỗi', found: 0 });
+      showStatus(error?.message || 'Không thể quét Facebook', 'err');
+    } finally {
+      clearInterval(elapsedTimer);
       setFacebookScanActive(false);
-      updateFacebookScanMetrics({ state: 'Lỗi', found: facebookScanUids.size });
-      showStatus(result?.error || 'Không thể bắt đầu quét Facebook', 'err');
+      if ($('facebookScanCancelBtn')) $('facebookScanCancelBtn').style.display = '';
     }
   }
 

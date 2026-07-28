@@ -12,6 +12,7 @@ const { getVideoInfo, getVideoInfoMulti } = require('./video-info');
 const { downloadVideo, downloadSubtitle, downloadThumbnail } = require('./downloader');
 const { scanChannelVideos } = require('./core/media/scan-service');
 const { startDomScanner } = require('./core/facebook/fb-dom-scanner');
+const { scanFacebookPageReels } = require('./core/platforms/facebook/facebook-page-reels-scanner');
 const {
   deleteCustomProfile,
   getDownloadProfiles,
@@ -352,6 +353,16 @@ function _stopActiveFacebookScan(reason = 'replaced') {
 }
 
 function _registerFacebookScanner() {
+  ipcMain.handle('scan-facebook-page-reels-dedicated', async (_event, payload = {}) => {
+    _requireLicense();
+    return scanFacebookPageReels({
+      url: payload.url,
+      maxVideos: Number.isFinite(payload.maxVideos) ? payload.maxVideos : 20,
+      waitAfterLoadMs: 2200,
+      scrollPauseMs: 1100,
+    });
+  });
+
   ipcMain.handle('scan-facebook-page', async (_event, payload = {}) => {
     _requireLicense();
     _stopActiveFacebookScan('replaced');
