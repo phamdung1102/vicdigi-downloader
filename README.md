@@ -1,9 +1,9 @@
-# VICdigi Downloader
+# Andrew Downloader
 
 Electron desktop app for downloading media from YouTube and common social platforms, with subtitle, thumbnail, batch, profiles, a persistent queue, and automatic updates.
 
 ## Version
-`8.1.0` — Electron 38, auto-update via GitHub Releases.
+`8.2.0` — Electron 38, auto-update via GitHub Releases.
 
 ## Highlights
 - Focused video workflow with quick presets, advanced naming/conflict controls, disk-space checks, and clipboard paste.

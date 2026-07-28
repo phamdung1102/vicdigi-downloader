@@ -65,8 +65,8 @@ function setupAutoUpdater(mainWindow, isBusy = () => false) {
     }
     const { response } = await dialog.showMessageBox(mainWindow, {
       type: 'info',
-      title: 'Phiên bản VICdigi Downloader mới',
-      message: `VICdigi Downloader ${info?.version ? `v${info.version}` : 'phiên bản mới'} đã sẵn sàng.`,
+      title: 'Phiên bản Andrew Downloader mới',
+      message: `Andrew Downloader ${info?.version ? `v${info.version}` : 'phiên bản mới'} đã sẵn sàng.`,
       detail: 'Bản cập nhật ứng dụng đã được tải xong. Khởi động lại để sử dụng các tính năng và cải tiến mới.',
       buttons: ['Cập nhật và khởi động lại', 'Để sau'],
       defaultId: 0,

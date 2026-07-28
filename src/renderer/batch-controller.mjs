@@ -69,7 +69,7 @@ export function createBatchController(deps) {
       format,
       quality,
       sourceMode: getBatchSourceMode(),
-      historyTitle: `${selectedVideos.length} video (batch)`,
+      historyTitle: `${selectedVideos.length} video (hàng loạt)`,
     });
   }
 
@@ -79,7 +79,7 @@ export function createBatchController(deps) {
       format,
       quality,
       sourceMode = 'channel',
-      historyTitle = `${selectedVideos.length} video (batch)`,
+      historyTitle = `${selectedVideos.length} video (hàng loạt)`,
     } = options;
 
     setState({ batchCancelled: false, lastBatchFailedVideos: [] });

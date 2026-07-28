@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob: file:; connect-src 'self' https:; media-src 'self' https: data: blob:; font-src 'self' data:;">
-<title>VICdigi Downloader</title>
+<title>Andrew Downloader</title>
 <link rel="stylesheet" href="./src/renderer/v6.css">
 </head>
 <body>
@@ -16,8 +16,8 @@
   ══════════════════════════════════════════════════════ -->
   <header class="header">
     <div class="brand">
-      <div class="brand-icon">⬇</div>
-      <div class="brand-name">VICdigi</div>
+      <img class="brand-icon" src="./assets/icon.png" alt="" />
+      <div class="brand-name">Andrew Downloader</div>
     </div>
 
     <!-- Central URL bar — dùng chung cho cả 2 tab -->
@@ -48,7 +48,7 @@
 
     <div class="nav-item active" id="nav-single">
       <span class="nav-icon">🎬</span>
-      <span>Video đơn</span>
+      <span>Tải video</span>
     </div>
     <div class="nav-item" id="nav-batch">
       <span class="nav-icon">📦</span>
@@ -470,21 +470,21 @@
     <div class="settings-stack">
       <div class="ver-box settings-card">
         <div class="field-wrap">
-          <label class="field-label" for="parallelDownloads">Luồng tải liên tục</label>
+          <label class="field-label" for="parallelDownloads">Tải đồng thời</label>
           <div class="settings-row">
             <div style="flex:1;min-width:0;">
               <select class="field" id="parallelDownloads">
-                <option value="1">1 luồng (tuần tự)</option>
-                <option value="2">2 luồng</option>
-                <option value="3">3 luồng</option>
-                <option value="4">4 luồng</option>
-                <option value="5">5 luồng</option>
-                <option value="6">6 luồng</option>
+                <option value="1">1 tác vụ (tuần tự)</option>
+                <option value="2">2 tác vụ</option>
+                <option value="3">3 tác vụ</option>
+                <option value="4">4 tác vụ</option>
+                <option value="5">5 tác vụ</option>
+                <option value="6">6 tác vụ</option>
               </select>
             </div>
           </div>
           <p class="settings-note" id="parallelDownloadsNote">
-            Tăng số luồng để tải liên tục nhiều job cùng lúc. Khuyên dùng 2-3 luồng để ổn định hơn.
+            Chọn số tác vụ được tải cùng lúc. Khuyên dùng 2–3 tác vụ để ổn định.
           </p>
         </div>
       </div>
@@ -510,11 +510,11 @@
             <option value="">Đang tải mẫu cấu hình…</option>
           </select>
           <p class="settings-note" id="profileDescription">
-            Chọn preset để áp nhanh cấu hình cho Video đơn hoặc Hàng loạt.
+            Chọn mẫu để áp nhanh cho tải video hoặc tải hàng loạt.
           </p>
           <div class="settings-row">
             <div class="dc-toolbar">
-              <button class="btn btn-ghost btn-sm" id="applySingleProfileBtn">Áp cho Video đơn</button>
+              <button class="btn btn-ghost btn-sm" id="applySingleProfileBtn">Áp cho tải video</button>
               <button class="btn btn-ghost btn-sm" id="applyBatchProfileBtn">Áp cho Hàng loạt</button>
               <button class="btn btn-primary btn-sm" id="applyAllProfileBtn">Áp cả hai</button>
             </div>
@@ -547,7 +547,7 @@
           <div>
           <div class="field-label">Thành phần hệ thống</div>
           <div class="settings-note">Kiểm tra và cập nhật các thành phần hỗ trợ tải xuống.</div>
-            <div class="settings-note" id="persistenceStatusText">Persistence: đang kiểm tra…</div>
+            <div class="settings-note" id="persistenceStatusText">Lưu trạng thái: đang kiểm tra…</div>
             <div class="settings-note" id="appUpdateStatusText">Ứng dụng sẽ tự kiểm tra bản cập nhật.</div>
           </div>
           <div class="dc-toolbar">

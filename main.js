@@ -52,7 +52,7 @@ function createWindow() {
     icon:            path.join(__dirname, 'assets', 'icon.png'),
     titleBarStyle:   'default',
     show:            false,
-    title:           `VICdigi Downloader v${app.getVersion()}`,
+    title:           `Andrew Downloader v${app.getVersion()}`,
     autoHideMenuBar: true,
   });
 
@@ -116,7 +116,7 @@ app.whenReady().then(async () => {
   // 4. Cập nhật caps vào handlers ngay
   updateCaps(capabilities);
 
-  mainWindow.setTitle(`VICdigi Downloader v${app.getVersion()}`);
+  mainWindow.setTitle(`Andrew Downloader v${app.getVersion()}`);
 
   // 4b. Auto-update qua GitHub Releases (chỉ chạy với bản packaged)
   if (!IS_SMOKE_RENDERER) {
@@ -191,6 +191,7 @@ function _setupDlManagerEvents(dlManager) {
           if (mainWindow?.isMinimized()) mainWindow.restore();
           mainWindow?.show();
           mainWindow?.focus();
+          mainWindow?.webContents?.send('open-download-center', { id: data?.id || '' });
         });
         notification.show();
       }
@@ -224,5 +225,5 @@ async function _runRendererSmoke(window) {
   throw new Error('Renderer boot timeout after 15s');
 }
 
-console.log(`🚀 VICdigi Downloader v${app.getVersion()} — main.js loaded`);
+console.log(`🚀 Andrew Downloader v${app.getVersion()} — main.js loaded`);
 

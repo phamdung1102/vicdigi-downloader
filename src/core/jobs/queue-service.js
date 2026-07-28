@@ -110,6 +110,10 @@ class QueueService extends EventBus {
     if (!progressMatch) return;
 
     download.progress = parseFloat(progressMatch[1]);
+    const speedMatch = output.match(/at\s+([0-9.]+\s*[KMGTP]?i?B\/s)/i);
+    const etaMatch = output.match(/ETA\s+([0-9:]+)/i);
+    if (speedMatch) download.downloadSpeedText = speedMatch[1].replace(/\s+/g, ' ');
+    if (etaMatch) download.etaText = etaMatch[1];
     this.emit('download-progress', {
       id: download.id,
       progress: download.progress,
@@ -174,6 +178,22 @@ class QueueService extends EventBus {
 
   sortQueue() {
     this.queue.sort((a, b) => b.priority - a.priority);
+  }
+
+  reorderDownload(downloadId, beforeDownloadId) {
+    const fromIndex = this.queue.findIndex(item => item.id === downloadId);
+    const toIndex = this.queue.findIndex(item => item.id === beforeDownloadId);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return false;
+
+    const [download] = this.queue.splice(fromIndex, 1);
+    const targetIndex = this.queue.findIndex(item => item.id === beforeDownloadId);
+    this.queue.splice(targetIndex, 0, download);
+    this.queue.forEach((item, index) => {
+      item.priority = this.queue.length - index;
+    });
+    this.emit('download-queue-reordered', { downloadId, beforeDownloadId });
+    this.persistSnapshot();
+    return true;
   }
 
   async processQueue() {
@@ -484,6 +504,17 @@ class QueueService extends EventBus {
       if (this.resumeDownload(id)) count += 1;
     });
     return count;
+  }
+
+  prioritizeDownload(downloadId) {
+    const index = this.queue.findIndex(download => download.id === downloadId);
+    if (index < 0) return false;
+    const [download] = this.queue.splice(index, 1);
+    download.priority = Math.max(100, Number(download.priority || 0) + 10);
+    this.queue.unshift(download);
+    this.emit('download-prioritized', download);
+    this.persistSnapshot();
+    return true;
   }
 
   async cancelDownload(downloadId) {

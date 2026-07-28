@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// VICdigi Downloader — preload.js
+// Andrew Downloader — preload.js
 // Chạy trong Node.js context, KHÔNG có window/navigator/document
 // Chỉ dùng: contextBridge, ipcRenderer, process
 // ============================================================
@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearFailed: () => invoke('clear-failed'),
   pauseAllDownloads: () => invoke('pause-all-downloads'),
   resumeAllDownloads: () => invoke('resume-all-downloads'),
+  prioritizeDownload: (id) => invoke('prioritize-download', id),
+  reorderDownload: (id, beforeId) => invoke('reorder-download', id, beforeId),
 
   // ── Batch ─────────────────────────────────────────────────
   scanChannelVideos: (options) => invoke('scan-channel-videos', options),
@@ -138,6 +140,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onDownloadRetry:           (cb) => ipcRenderer.on('download-retry',             (_e, d) => cb(d)),
   onDownloadCancelled:       (cb) => ipcRenderer.on('download-cancelled',         (_e, d) => cb(d)),
   onDownloadPaused:          (cb) => ipcRenderer.on('download-paused',            (_e, d) => cb(d)),
+  onOpenDownloadCenter:      (cb) => ipcRenderer.on('open-download-center',       (_e, d) => cb(d)),
 
 });
 

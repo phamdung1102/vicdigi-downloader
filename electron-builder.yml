@@ -1,6 +1,6 @@
 appId: com.vicdigi.downloader
-productName: VICdigi Downloader
-copyright: Copyright © 2024-2025 AndrewPham
+productName: Andrew Downloader
+copyright: Copyright © 2024-2026 Andrew Phạm
 
 directories:
   output: dist
@@ -79,7 +79,7 @@ nsis:
   installerHeaderIcon: assets/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: VICdigi Downloader
+  shortcutName: Andrew Downloader
   license: LICENSE.md
   deleteAppDataOnUninstall: false
   menuCategory: true

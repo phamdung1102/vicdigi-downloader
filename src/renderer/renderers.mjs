@@ -98,7 +98,7 @@ export function renderBatchList(container, videos, selectedIndexes, onToggle, fo
       children: [
         createNode('div', {
           className: 'vi-name',
-          text: video.title || 'Unknown',
+          text: video.title || 'Không rõ tiêu đề',
         }),
         createNode('div', {
           className: 'vi-meta',
@@ -146,7 +146,7 @@ export function renderHistoryList(container, historyItems, actions = {}) {
           children: [
             createNode('div', {
               className: 'hi-title',
-              text: item.title || item.url || 'Unknown',
+              text: item.title || item.url || 'Không rõ tiêu đề',
             }),
             createNode('div', {
               className: 'hi-sub',
@@ -186,7 +186,7 @@ export function renderDownloadCenterJobs(container, groups = {}, actions = {}) {
   ].filter(section => section.items.length);
 
   if (!sections.length) {
-    renderEmptyState(container, '🧭', 'Chưa có tác vụ nào trong Download Center');
+    renderEmptyState(container, '🧭', 'Chưa có tác vụ nào trong Trung tâm tải xuống');
     return;
   }
 
@@ -199,17 +199,37 @@ export function renderDownloadCenterJobs(container, groups = {}, actions = {}) {
 
     section.items.forEach(item => {
       const status = String(item.status || section.key);
+      const statusLabels = {
+        downloading: 'Đang tải',
+        retrying: 'Đang thử lại',
+        queued: 'Chờ xử lý',
+        paused: 'Tạm dừng',
+        failed: 'Lỗi',
+        completed: 'Hoàn tất',
+      };
       const metaParts = [
         item.platform || '',
-        status,
+        statusLabels[status] || status,
         item.progress !== undefined ? `${Math.round(item.progress || 0)}%` : '',
+        item.downloadSpeedText || formatSpeed(item.downloadSpeed),
+        item.etaText ? `còn ${item.etaText}` : '',
       ].filter(Boolean);
 
       const actionNodes = [];
-      if (['failed', 'paused'].includes(status)) {
+      if (status === 'failed') {
         actionNodes.push(actionButton('Thử lại', () => actions.onRetry?.(item)));
+        actionNodes.push(actionButton('Chi tiết', () => actions.onDetails?.(item)));
       }
-      if (['queued', 'downloading', 'retrying'].includes(status)) {
+      if (status === 'paused') {
+        actionNodes.push(actionButton('Tiếp tục', () => actions.onResume?.(item)));
+      }
+      if (['downloading', 'retrying'].includes(status)) {
+        actionNodes.push(actionButton('Tạm dừng', () => actions.onPause?.(item)));
+      }
+      if (status === 'queued') {
+        actionNodes.push(actionButton('Ưu tiên', () => actions.onPrioritize?.(item)));
+      }
+      if (['queued', 'downloading', 'retrying', 'paused'].includes(status)) {
         actionNodes.push(actionButton('Hủy', () => actions.onCancel?.(item), 'danger'));
       }
       if (item.outputFile) {
@@ -220,21 +240,24 @@ export function renderDownloadCenterJobs(container, groups = {}, actions = {}) {
         actionNodes.push(actionButton('Mở thư mục', () => actions.onOpenFolder?.(item)));
       }
 
-      block.appendChild(
-        createNode('div', {
+      const row = createNode('div', {
           className: `dc-row ${status}`.trim(),
+          dataset: { jobId: String(item.id || '') },
           children: [
             createNode('div', {
               className: 'dc-row-main',
               children: [
                 createNode('div', {
                   className: 'dc-row-title',
-                  text: item.title || item.url || item.id || 'Download',
+                  text: item.title || item.url || item.id || 'Tác vụ tải xuống',
                 }),
                 createNode('div', {
                   className: 'dc-row-meta',
                   text: metaParts.join(' · '),
                 }),
+                ['downloading', 'retrying'].includes(status)
+                  ? createProgressBar(item.progress || 0)
+                  : null,
               ],
             }),
             createNode('div', {
@@ -242,12 +265,50 @@ export function renderDownloadCenterJobs(container, groups = {}, actions = {}) {
               children: actionNodes,
             }),
           ],
-        }),
-      );
+        });
+      if (status === 'queued') {
+        row.draggable = true;
+        row.title = 'Kéo để thay đổi thứ tự tải';
+        row.addEventListener('dragstart', event => {
+          event.dataTransfer?.setData('text/plain', String(item.id || ''));
+          row.classList.add('dragging');
+        });
+        row.addEventListener('dragend', () => row.classList.remove('dragging'));
+        row.addEventListener('dragover', event => event.preventDefault());
+        row.addEventListener('drop', event => {
+          event.preventDefault();
+          const sourceId = event.dataTransfer?.getData('text/plain');
+          if (sourceId && sourceId !== String(item.id)) actions.onReorder?.(sourceId, item.id);
+        });
+      }
+      block.appendChild(row);
     });
 
     container.appendChild(block);
   });
+}
+
+function createProgressBar(percent) {
+  const safe = Math.max(0, Math.min(100, Number(percent || 0)));
+  const fill = createNode('div', { className: 'dc-row-progress-fill' });
+  fill.style.width = `${safe}%`;
+  return createNode('div', {
+    className: 'dc-row-progress',
+    children: [fill],
+  });
+}
+
+function formatSpeed(bytesPerSecond) {
+  const value = Number(bytesPerSecond || 0);
+  if (!value) return '';
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  let size = value;
+  let index = 0;
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024;
+    index += 1;
+  }
+  return `${size.toFixed(index ? 1 : 0)} ${units[index]}`;
 }
 
 function actionButton(label, handler, kind = 'ghost') {

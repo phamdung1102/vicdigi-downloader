@@ -244,6 +244,10 @@ const VIC = (() => {
     api?.onDownloadRetry?.(refreshLater);
     api?.onDownloadCancelled?.(refreshLater);
     api?.onDownloadPaused?.(refreshLater);
+    api?.onOpenDownloadCenter?.(payload => {
+      openDownloadCenterModal();
+      setTimeout(() => focusDownloadJob(payload?.id), 80);
+    });
   }
 
   function applySocialCookiePath() {
@@ -292,6 +296,11 @@ const VIC = (() => {
     if (!container) return;
     renderDownloadCenterJobs(container, downloadCenter, {
       onRetry: retryDownloadJob,
+      onPause: pauseDownloadJob,
+      onResume: resumeDownloadJob,
+      onPrioritize: prioritizeDownloadJob,
+      onReorder: reorderDownloadJob,
+      onDetails: showDownloadJobDetails,
       onCancel: cancelDownloadJob,
       onOpenFolder: openDownloadJobFolder,
       onRevealFile: revealDownloadJobFile,
@@ -375,6 +384,51 @@ const VIC = (() => {
     await api?.clearFailed?.();
     await refreshDownloadCenter();
     showStatus(TEXT.downloadCenter.clearFailed, 'ok');
+  }
+
+  async function pauseDownloadJob(job) {
+    const result = await api?.pauseDownload?.(job.id);
+    if (!result?.success) return showStatus('Không thể tạm dừng tác vụ này.', 'warn');
+    await refreshDownloadCenter();
+  }
+
+  async function resumeDownloadJob(job) {
+    const result = await api?.resumeDownload?.(job.id);
+    if (!result?.success) return showStatus('Không thể tiếp tục tác vụ này.', 'warn');
+    await refreshDownloadCenter();
+  }
+
+  async function prioritizeDownloadJob(job) {
+    const result = await api?.prioritizeDownload?.(job.id);
+    if (!result?.success) return showStatus('Không thể đổi ưu tiên tác vụ này.', 'warn');
+    showStatus('Đã đưa tác vụ lên đầu hàng đợi.', 'ok');
+    await refreshDownloadCenter();
+  }
+
+  async function reorderDownloadJob(downloadId, beforeDownloadId) {
+    const result = await api?.reorderDownload?.(downloadId, beforeDownloadId);
+    if (!result?.success) return showStatus('Không thể thay đổi thứ tự hàng đợi.', 'warn');
+    await refreshDownloadCenter();
+  }
+
+  function showDownloadJobDetails(job) {
+    const detail = [
+      job.title || 'Tác vụ tải xuống',
+      job.error ? `Lỗi: ${job.error}` : '',
+      job.url ? `Liên kết: ${job.url}` : '',
+      job.outputPath ? `Thư mục: ${job.outputPath}` : '',
+    ].filter(Boolean).join('\n\n');
+    window.alert(detail);
+  }
+
+  function focusDownloadJob(id) {
+    if (!id) return;
+    const escaped = window.CSS?.escape ? CSS.escape(String(id)) : String(id).replace(/"/g, '\\"');
+    const row = document.querySelector(`.dc-row[data-job-id="${escaped}"]`);
+    if (!row) return;
+    row.classList.add('focused');
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => row.classList.remove('focused'), 2200);
   }
 
   async function checkApplicationUpdate() {
@@ -865,7 +919,7 @@ const VIC = (() => {
 
   async function loadAppInfo() {
     const info = await api?.getAppInfo?.();
-    if ($('appVersionText')) $('appVersionText').textContent = `VICdigi Downloader ${info?.version ? `v${info.version}` : ''}`;
+    if ($('appVersionText')) $('appVersionText').textContent = `Andrew Downloader ${info?.version ? `v${info.version}` : ''}`;
     if ($('systemComponentsText')) {
       const caps = info?.capabilities || {};
       $('systemComponentsText').textContent = [

@@ -311,6 +311,10 @@ function _registerDownloadManager() {
   ipcMain.handle('clear-failed',      ()       => { _dlManager?.clearFailed();    return { success: true }; });
   ipcMain.handle('pause-all-downloads', async () => ({ success: true, count: await (_dlManager?.pauseAllDownloads?.() || 0) }));
   ipcMain.handle('resume-all-downloads', () => ({ success: true, count: _dlManager?.resumeAllDownloads?.() || 0 }));
+  ipcMain.handle('prioritize-download', (_e, id) => ({ success: _dlManager?.prioritizeDownload?.(id) || false }));
+  ipcMain.handle('reorder-download', (_e, id, beforeId) => ({
+    success: _dlManager?.reorderDownload?.(id, beforeId) || false,
+  }));
 }
 
 // ── BATCH ────────────────────────────────────────────────────
