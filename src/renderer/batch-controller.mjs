@@ -17,6 +17,7 @@ export function createBatchController(deps) {
     getBatchSourceMode,
     showStatus,
     ensureBatchAccess,
+    getBatchScanTarget,
   } = deps;
   let titleFilter = '';
   let sortMode = 'default';
@@ -24,6 +25,13 @@ export function createBatchController(deps) {
   function renderBatch() {
     const { batchVideos, batchSelected } = getState();
     $('totalCount').textContent = batchVideos.length;
+    const scanTarget = Number(getBatchScanTarget?.() || 0);
+    if ($('batchScanTarget')) {
+      $('batchScanTarget').style.display = scanTarget > 0 ? 'inline' : 'none';
+      $('batchScanTarget').textContent = scanTarget > 0
+        ? `· Đã tìm ${batchVideos.length} · Mục tiêu ${scanTarget}`
+        : '';
+    }
     const visibleVideos = getVisibleVideos(batchVideos);
     updateBatchCount();
     renderBatchList($('videoGrid'), visibleVideos, batchSelected, toggleBatchSelection, formatDuration);
@@ -50,7 +58,10 @@ export function createBatchController(deps) {
     const mbps = quality === '4k' ? 18 : quality === '1080p' ? 8 : quality === '720p' ? 5 : 2.5;
     const seconds = selectedVideos.reduce((sum, video) => sum + Number(video.duration || 0), 0);
     const bytes = seconds > 0 ? seconds * mbps * 1000000 / 8 : 0;
-    $('batchTotalVideos').textContent = `${videos.length} video`;
+    const scanTarget = Number(getBatchScanTarget?.() || 0);
+    $('batchTotalVideos').textContent = scanTarget > 0
+      ? `${videos.length}/${scanTarget} video`
+      : `${videos.length} video`;
     $('batchSelectedVideos').textContent = `${selectedVideos.length} video`;
     $('batchEstimatedSize').textContent = bytes ? formatBytes(bytes) : 'Chưa đủ dữ liệu';
   }

@@ -681,6 +681,12 @@ select.field {
 }
 .select-count b { color: var(--accent) }
 
+.batch-scan-target {
+  margin-left: 7px;
+  color: var(--info);
+  font-weight: 600;
+}
+
 .video-list {
   display: flex;
   flex-direction: column;

@@ -1241,6 +1241,7 @@ const VIC = (() => {
       $('scanFacebookBtn').innerHTML = isActive ? '<span class="spin"></span> Đang quét...' : 'Quét Facebook';
     }
     if ($('facebookScanCancelBtn')) $('facebookScanCancelBtn').disabled = !isActive;
+    renderBatch();
   }
 
   function updateFacebookScanMetrics(status = {}) {
@@ -1434,6 +1435,9 @@ const VIC = (() => {
     getBatchSourceMode: () => ui.batchSourceMode || 'channel',
     showStatus,
     ensureBatchAccess: () => ensureLicenseAccess('tai hang loat'),
+    getBatchScanTarget: () => facebookScanActive
+      ? Math.min(parseInt($('maxVideos')?.value, 10) || DEFAULTS.maxVideos, 200)
+      : 0,
   });
 
   updateController = createUpdateController({
