@@ -840,6 +840,17 @@ select.field {
   box-shadow: 0 8px 28px rgba(0,0,0,.12);
 }
 
+.batch-source-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.facebook-source-note {
+  color: var(--txt-mid);
+  font-size: 11px;
+}
+
 .batch-source-input {
   min-height: 116px;
   resize: vertical;

@@ -269,26 +269,42 @@
 
       <div class="card batch-source-card">
         <div class="card-title">Nguồn tải</div>
-        <textarea id="batchLinksInput" class="field batch-source-input"
-          placeholder="Dán playlist, kênh hoặc nhiều liên kết — mỗi liên kết một dòng"></textarea>
-        <input type="file" id="batchFileInput" accept=".txt,.csv" style="display:none;" />
-        <div class="batch-source-actions">
-          <div>
-            <span id="batchSourceType">Tự nhận diện nguồn</span>
-            <span id="linkCount">0 liên kết</span>
-            <span id="fileLoadedName"></span>
-          </div>
-          <div>
-            <button class="btn btn-ghost btn-sm" id="batchFilePickerBtn">Chọn file TXT</button>
-            <button class="btn btn-primary btn-sm" id="loadLinksBtn">Phân tích nguồn</button>
+        <div class="batch-source-tabs">
+          <button class="batch-src-tab active" id="srcTabUnified">Playlist, kênh và nhiều link</button>
+          <button class="batch-src-tab" id="srcTabFacebook">Facebook Page / Reels</button>
+        </div>
+
+        <div id="srcPanelUnified">
+          <textarea id="batchLinksInput" class="field batch-source-input"
+            placeholder="Dán playlist, kênh hoặc nhiều liên kết — mỗi liên kết một dòng"></textarea>
+          <input type="file" id="batchFileInput" accept=".txt,.csv" style="display:none;" />
+          <div class="batch-source-actions">
+            <div>
+              <span id="batchSourceType">Tự nhận diện nguồn</span>
+              <span id="linkCount">0 liên kết</span>
+              <span id="fileLoadedName"></span>
+            </div>
+            <div>
+              <button class="btn btn-ghost btn-sm" id="batchFilePickerBtn">Chọn file TXT</button>
+              <button class="btn btn-primary btn-sm" id="loadLinksBtn">Phân tích nguồn</button>
+            </div>
           </div>
         </div>
-        <div class="facebook-scan-bar" id="facebookScanBar" style="display:none;">
-          <span id="facebookScanState">Sẵn sàng</span>
-          <span>Link: <b id="facebookScanFound">0</b></span>
-          <span>Lượt quét: <b id="facebookScanDom">0</b></span>
-          <span>Thời gian: <b id="facebookScanElapsed">0s</b></span>
-          <button class="btn btn-danger btn-xs" id="facebookScanCancelBtn" disabled>Dừng quét</button>
+
+        <div id="srcPanelFacebook" style="display:none;">
+          <textarea id="facebookPageInput" class="field batch-source-input"
+            placeholder="Dán URL Facebook Page, trang Reels hoặc Videos"></textarea>
+          <div class="batch-source-actions">
+            <span class="facebook-source-note">App tự cuộn trang và thêm video vào danh sách theo thời gian thực.</span>
+            <button class="btn btn-primary btn-sm" id="scanFacebookBtn">Quét Facebook</button>
+          </div>
+          <div class="facebook-scan-bar">
+            <span id="facebookScanState">Sẵn sàng</span>
+            <span>Link: <b id="facebookScanFound">0</b></span>
+            <span>Lượt quét: <b id="facebookScanDom">0</b></span>
+            <span>Thời gian: <b id="facebookScanElapsed">0s</b></span>
+            <button class="btn btn-danger btn-xs" id="facebookScanCancelBtn" disabled>Dừng quét</button>
+          </div>
         </div>
       </div>
 

@@ -116,14 +116,6 @@ function buildScanPlan(normalizedUrl) {
     return { mode: 'numeric', numericId, tab, urls };
   } else {
     add(normalizedUrl);
-    const slug = parts[0] || '';
-    if (slug && slug !== 'profile.php' && !/^(reel|watch|videos?)$/i.test(slug)) {
-      add(`https://www.facebook.com/${slug}/reels/`);
-      add(`https://www.facebook.com/${slug}/videos/`);
-      add(`https://www.facebook.com/${slug}/?sk=reels`);
-      add(`https://www.facebook.com/${slug}/?sk=videos`);
-      add(`https://m.facebook.com/${slug}/videos/`);
-    }
   }
 
   return { mode: 'slug', numericId: '', tab: '', urls };
@@ -522,7 +514,7 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
     clearTimeout(noUidTimeout);
     const timeoutMs = discoveredInScan.size > 0 ? STALE_AFTER_FOUND_TIMEOUT_MS : INITIAL_NO_UID_TIMEOUT_MS;
     noUidTimeout = setTimeout(() => {
-      if (tryNextRoute('stale')) {
+      if (isNumericMode && tryNextRoute('stale')) {
         return;
       }
       stopScan('no-uids');
@@ -702,6 +694,7 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
       sendScannerStatus({ state: 'dom-scan', stableRounds });
 
       if (
+        isNumericMode &&
         discoveredInScan.size > 0 &&
         stableRounds >= STABLE_ROUTE_SWITCH_ROUNDS &&
         tryNextRoute('stable')
@@ -970,7 +963,6 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
 }
 
 module.exports = {
-  buildScanPlan,
   normalizeMaxVideos,
   normalizeFacebookUrl,
   startDomScanner

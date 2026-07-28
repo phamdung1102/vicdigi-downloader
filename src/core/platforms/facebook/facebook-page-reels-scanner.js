@@ -288,11 +288,11 @@ async function scanWithElectronDom(url, options = {}) {
   const targetCount = Number.isFinite(options.maxVideos) ? options.maxVideos : 20;
   const scrollSteps = Number.isFinite(options.scrollSteps)
     ? options.scrollSteps
-    : Math.max(30, Math.min(300, targetCount * 4));
+    : Math.max(16, Math.min(120, targetCount * 5));
   const scrollPauseMs = Number.isFinite(options.scrollPauseMs) ? options.scrollPauseMs : 1100;
   const stableRoundsLimit = Number.isFinite(options.stableRoundsLimit)
     ? options.stableRoundsLimit
-    : Math.max(20, Math.min(60, Math.ceil(targetCount / 4)));
+    : 8;
 
   const win = new BrowserWindow({
     show: false,

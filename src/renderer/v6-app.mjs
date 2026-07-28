@@ -134,11 +134,10 @@ const VIC = (() => {
     on('nav-history', 'click', () => switchTab('history'));
     on('nav-settings', 'click', openSettingsModal);
     on('nav-license', 'click', openLicenseModal);
-    on('srcTabChannel', 'click', () => switchBatchSrc('channel'));
+    on('srcTabUnified', 'click', () => switchBatchSrc('unified'));
     on('srcTabFacebook', 'click', () => switchBatchSrc('facebook'));
-    on('srcTabLinks', 'click', () => switchBatchSrc('links'));
-    on('srcTabFile', 'click', () => switchBatchSrc('file'));
     on('loadLinksBtn', 'click', scanVideos);
+    on('scanFacebookBtn', 'click', scanFacebookPageVideos);
     on('facebookScanCancelBtn', 'click', cancelFacebookScan);
     on('batchFilePickerBtn', 'click', () => $('batchFileInput')?.click());
     on('batchSelectAllBtn', 'click', batchSelectAll);
@@ -1099,21 +1098,6 @@ const VIC = (() => {
     }
   }
 
-  function toFacebookCollectionUrl(rawUrl) {
-    try {
-      const parsed = new URL(String(rawUrl || '').trim());
-      const parts = parsed.pathname.split('/').filter(Boolean);
-      if (/^(reels|videos)$/i.test(parts[1] || '')) return parsed.toString();
-      if (parts[0] && parts[0] !== 'reel' && parts[0] !== 'watch') {
-        parsed.pathname = `/${parts[0]}/reels/`;
-        parsed.search = '';
-      }
-      return parsed.toString();
-    } catch (_) {
-      return rawUrl;
-    }
-  }
-
   async function scanVideos() {
     if (!ensureLicenseAccess('quet danh sach video')) return;
 
@@ -1124,18 +1108,19 @@ const VIC = (() => {
     const url = urls[0];
     if ($('urlInput')) $('urlInput').value = url;
 
-    const isFacebook = isFacebookUrl(url);
-    const maxVideos = Math.min(
-      parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos,
-      isFacebook ? 200 : MAX_BATCH_VIDEOS,
-    );
-    const scanUrl = isFacebook ? toFacebookCollectionUrl(url) : url;
+    if (isFacebookUrl(url)) {
+      switchBatchSrc('facebook');
+      if ($('facebookPageInput')) $('facebookPageInput').value = url;
+      return showStatus('Facebook đã được tách sang tab riêng. Nhấn “Quét Facebook” để bắt đầu.', 'info');
+    }
+
+    const maxVideos = parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos;
     await persistUi({ maxVideos });
     $('loadLinksBtn').disabled = true;
     $('loadLinksBtn').innerHTML = '<span class="spin"></span> Đang phân tích...';
     batchSelected.clear();
     try {
-      const result = await api?.scanChannelVideos?.({ url: scanUrl, maxVideos });
+      const result = await api?.scanChannelVideos?.({ url, maxVideos });
       batchVideos = result?.videos || [];
       batchSelected = new Set(batchVideos.map((_, index) => index));
       renderBatch();
@@ -1251,9 +1236,9 @@ const VIC = (() => {
 
   function setFacebookScanActive(isActive) {
     facebookScanActive = isActive;
-    if ($('scanBtnHeader')) {
-      $('scanBtnHeader').disabled = isActive || (($('urlInput')?.value.trim() || '').length < 5);
-      $('scanBtnHeader').innerHTML = isActive ? '<span class="spin"></span> Đang quét...' : '<span>QUÉT</span>';
+    if ($('scanFacebookBtn')) {
+      $('scanFacebookBtn').disabled = isActive;
+      $('scanFacebookBtn').innerHTML = isActive ? '<span class="spin"></span> Đang quét...' : 'Quét Facebook';
     }
     if ($('facebookScanCancelBtn')) $('facebookScanCancelBtn').disabled = !isActive;
   }
@@ -1266,11 +1251,12 @@ const VIC = (() => {
   }
 
   async function scanFacebookPageVideos() {
-    const pageUrl = $('batchLinksInput')?.value.trim() || $('urlInput').value.trim();
+    const pageUrl = $('facebookPageInput')?.value.trim() || '';
     if (!pageUrl) return showStatus('Vui lòng dán URL Facebook Page/Reels vào ô trên', 'warn');
     if (!isFacebookUrl(pageUrl)) return showStatus('Nguồn Facebook Page/Reels chỉ nhận URL facebook.com', 'warn');
 
-    const maxVideos = parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos;
+    const maxVideos = Math.min(parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos, 200);
+    if ($('maxVideos')) $('maxVideos').value = String(maxVideos);
     await persistUi({ maxVideos, batchSourceMode: 'facebook' });
     resetFacebookMetadataResolver();
     facebookScanUids = new Set();

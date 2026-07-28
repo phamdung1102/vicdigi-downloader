@@ -259,12 +259,13 @@ export function createBatchController(deps) {
   }
 
   function switchBatchSrc(mode) {
-    persistUi({ batchSourceMode: mode });
-    ['channel', 'facebook', 'links', 'file'].forEach(name => {
+    const normalizedMode = mode === 'facebook' ? 'facebook' : 'unified';
+    persistUi({ batchSourceMode: normalizedMode });
+    ['unified', 'facebook'].forEach(name => {
       const title = name.charAt(0).toUpperCase() + name.slice(1);
-      $(`srcTab${title}`)?.classList.toggle('active', name === mode);
+      $(`srcTab${title}`)?.classList.toggle('active', name === normalizedMode);
       const panel = $(`srcPanel${title}`);
-      if (panel) panel.style.display = name === mode ? '' : 'none';
+      if (panel) panel.style.display = name === normalizedMode ? '' : 'none';
     });
   }
 
