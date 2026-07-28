@@ -413,7 +413,10 @@ async function collectDomSnapshot(webContents, baseUrl) {
         hrefs: anchors.concat(roleLinks),
         canonical,
         location: window.location.href,
-        html: html.slice(0, 1800000),
+        // Cursor và collection token thường nằm cuối các script hydration rất lớn.
+        // Cắt HTML ở 1.8 MB khiến scanner chỉ thấy batch đầu (thường là 10 video)
+        // nhưng không bao giờ lấy được cursor để gọi trang 2, 3, 4.
+        html,
         text: text.slice(0, 300000)
       };
     })();`,
@@ -1002,7 +1005,8 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
       );
       scrollCount += 1;
       sendScannerStatus({ state: 'scroll', scroll: scrollResult });
-      await new Promise((resolve) => setTimeout(resolve, 420));
+      // Facebook cần thời gian hydrate batch kế tiếp sau sự kiện scroll.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
       await runDomScan();
       await runPaginationFetch();
     } catch (error) {
