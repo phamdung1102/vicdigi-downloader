@@ -1324,6 +1324,54 @@ select.field {
   gap: 10px;
 }
 
+.license-contact-card {
+  display:grid;
+  grid-template-columns:148px minmax(0,1fr);
+  gap:16px;
+  align-items:center;
+  padding:14px;
+  border:1px solid var(--accent-border);
+  border-radius:var(--r-lg);
+  background:linear-gradient(135deg,rgba(110,231,183,.09),var(--s2));
+}
+.license-contact-qr {
+  display:block;
+  overflow:hidden;
+  border:1px solid rgba(110,231,183,.32);
+  border-radius:12px;
+  background:#fff;
+  box-shadow:0 6px 18px rgba(0,0,0,.18);
+}
+.license-contact-qr img { display:block;width:100%;height:auto; }
+.license-contact-info {
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:5px;
+}
+.license-contact-title { color:var(--txt-hi);font-size:17px;font-weight:750; }
+.license-contact-info > a {
+  color:var(--accent);
+  font-size:13px;
+  font-weight:700;
+  text-decoration:none;
+}
+.license-contact-phone {
+  color:var(--txt-hi);
+  font-size:18px;
+  font-weight:750;
+  letter-spacing:.4px;
+}
+.license-contact-actions { display:flex;flex-wrap:wrap;gap:7px;margin-top:4px; }
+.license-contact-actions a.btn { text-decoration:none; }
+.license-contact-info p {
+  margin:3px 0 0;
+  color:var(--txt-lo);
+  font-size:11px;
+  line-height:1.45;
+}
+
 .license-stat-box {
   padding: 14px 15px;
   border-radius: var(--r-md);
@@ -1342,6 +1390,7 @@ select.field {
 }
 
 @media (max-width: 760px) {
+  .license-contact-card { grid-template-columns:110px minmax(0,1fr); }
   .license-summary-grid,
   .dl-grid,
   .batch-opts,

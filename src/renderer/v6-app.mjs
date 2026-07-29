@@ -172,6 +172,10 @@ const VIC = (() => {
     on('refreshLicenseBtn', 'click', () => refreshLicenseStatus({ notify: true }));
     on('clearLicenseBtn', 'click', clearLicense);
     on('copyMachineIdBtn', 'click', copyMachineId);
+    on('copyLicensePhoneBtn', 'click', async () => {
+      await api?.copyText?.('0918757192');
+      showStatus('Đã sao chép số điện thoại 0918757192', 'ok');
+    });
     on('downloadCenterCloseBtn', 'click', closeDownloadCenterModal);
     on('licenseCloseBtn', 'click', closeLicenseModal);
     on('dcCloseBtn', 'click', closeDownloadCenterModal);
