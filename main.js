@@ -7,6 +7,7 @@
 const { app, BrowserWindow, Menu, Notification, ipcMain } = require('electron');
 const path  = require('path');
 const fs    = require('fs-extra');
+const http  = require('http');
 const Store = require('electron-store');
 
 const caps               = require('./src/capabilities');
@@ -19,6 +20,8 @@ const store = new Store();
 const IS_SMOKE_RENDERER = process.argv.includes('--smoke-renderer');
 const PROTOCOL_SCHEME = 'andrew-downloader';
 let pendingBrowserUrl = '';
+const quickDownloadStatuses = new Map();
+let quickStatusServer = null;
 
 function parseProtocolUrl(value) {
   try {
@@ -29,6 +32,7 @@ function parseProtocolUrl(value) {
     return {
       url: target,
       action: parsed.hostname === 'download' || parsed.searchParams.get('action') === 'download' ? 'download' : 'open',
+      requestId: String(parsed.searchParams.get('requestId') || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80),
     };
   } catch (_) {
     return null;
@@ -103,6 +107,36 @@ ipcMain.on('renderer-ready', () => {
   flushPendingBrowserUrl();
 });
 
+ipcMain.on('quick-download-status', (_event, payload = {}) => {
+  const requestId = String(payload.requestId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
+  if (!requestId) return;
+  quickDownloadStatuses.set(requestId, {
+    state: ['starting', 'downloading', 'completed', 'failed'].includes(payload.state) ? payload.state : 'starting',
+    percent: Math.max(0, Math.min(100, Math.round(Number(payload.percent) || 0))),
+    message: String(payload.message || '').slice(0, 160),
+    updatedAt: Date.now(),
+  });
+});
+
+function startQuickStatusServer() {
+  if (quickStatusServer) return;
+  quickStatusServer = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-store');
+    const requestUrl = new URL(req.url || '/', 'http://127.0.0.1');
+    if (requestUrl.pathname !== '/status') {
+      res.writeHead(404).end();
+      return;
+    }
+    const requestId = String(requestUrl.searchParams.get('id') || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
+    const status = quickDownloadStatuses.get(requestId) || { state: 'starting', percent: 0, message: 'Đang kết nối ứng dụng' };
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify(status));
+  });
+  quickStatusServer.on('error', error => console.warn('[quick-status]', error.message));
+  quickStatusServer.listen(32145, '127.0.0.1');
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200, height: 800,
@@ -154,6 +188,7 @@ function createWindow() {
 
 // ── App lifecycle ─────────────────────────────────────────────
 app.whenReady().then(async () => {
+  startQuickStatusServer();
   if (!IS_SMOKE_RENDERER) {
     if (process.defaultApp && process.argv[1]) {
       app.setAsDefaultProtocolClient(PROTOCOL_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
@@ -235,6 +270,7 @@ app.on('window-all-closed', () => {
 
 // Dừng các tác vụ đang chạy và chốt snapshot trước khi thoát
 app.on('before-quit', () => {
+  try { quickStatusServer?.close(); } catch (_) {}
   try { _dlManagerRef?.shutdown?.(); } catch (_) {}
 });
 

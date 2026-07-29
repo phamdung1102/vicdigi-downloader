@@ -4,9 +4,58 @@
   let updateQueued = false;
   let activeVideoUrl = '';
 
-  function sendDownload(url) {
+  async function sendDownload(url, button) {
     if (!/^https?:\/\//i.test(String(url || ''))) return;
-    location.href = `andrew-downloader://download?url=${encodeURIComponent(url)}`;
+    const requestId = `${Date.now()}-${crypto.randomUUID().replaceAll('-', '')}`;
+    showButtonStatus(button, 'Đang kết nối…', 'working');
+    location.href = `andrew-downloader://download?url=${encodeURIComponent(url)}&requestId=${encodeURIComponent(requestId)}`;
+    pollDownloadStatus(requestId, button);
+  }
+
+  function showButtonStatus(button, text, state = 'working') {
+    if (!button) return;
+    let status = button.parentElement?.querySelector?.(`:scope > .andrew-download-progress[data-for="${button.dataset.andrewId}"]`);
+    if (!status) {
+      button.dataset.andrewId ||= crypto.randomUUID();
+      status = document.createElement('div');
+      status.className = 'andrew-download-progress';
+      if (button.id === BUTTON_ID) status.classList.add('andrew-primary-progress');
+      status.dataset.for = button.dataset.andrewId;
+      button.insertAdjacentElement('afterend', status);
+    }
+    status.textContent = text;
+    if (button.id === BUTTON_ID) {
+      const rect = button.getBoundingClientRect();
+      status.style.top = `${rect.bottom + 5}px`;
+      status.style.right = `${Math.max(8, innerWidth - rect.right)}px`;
+    }
+    status.dataset.state = state;
+    status.hidden = false;
+  }
+
+  async function pollDownloadStatus(requestId, button) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 30 * 60 * 1000) {
+      await new Promise(resolve => setTimeout(resolve, 700));
+      try {
+        const response = await fetch(`http://127.0.0.1:32145/status?id=${encodeURIComponent(requestId)}`, { cache: 'no-store' });
+        if (!response.ok) continue;
+        const status = await response.json();
+        if (status.state === 'completed') {
+          showButtonStatus(button, '✓ Tải xong', 'completed');
+          return;
+        }
+        if (status.state === 'failed') {
+          showButtonStatus(button, `Lỗi: ${status.message || 'Không tải được'}`, 'failed');
+          return;
+        }
+        const percent = Math.max(0, Math.min(99, Number(status.percent) || 0));
+        showButtonStatus(button, percent > 0 ? `Đang tải ${Math.round(percent)}%` : (status.message || 'Đang kết nối…'), 'working');
+      } catch (_) {
+        showButtonStatus(button, 'Đang mở ứng dụng…', 'working');
+      }
+    }
+    showButtonStatus(button, 'Quá thời gian chờ', 'failed');
   }
 
   function resolveVideoUrl(video) {
@@ -43,7 +92,7 @@
     button.addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
-      sendDownload(activeVideoUrl || location.href);
+      sendDownload(activeVideoUrl || location.href, button);
     }, true);
 
     document.documentElement.appendChild(button);
@@ -83,6 +132,11 @@
     button.style.right = `${Math.max(8, innerWidth - target.rect.right + 10)}px`;
     button.style.top = `${Math.max(8, target.rect.top + 10)}px`;
     button.classList.add('andrew-visible');
+    const progress = document.querySelector(`.andrew-primary-progress[data-for="${button.dataset.andrewId}"]`);
+    if (progress) {
+      progress.style.top = `${Math.max(8, target.rect.top + 49)}px`;
+      progress.style.right = `${Math.max(8, innerWidth - target.rect.right + 10)}px`;
+    }
   }
 
   function scanYouTubeCards() {
@@ -118,7 +172,7 @@
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
-        sendDownload(cardUrl);
+        sendDownload(cardUrl, button);
       }, true);
       host.appendChild(button);
     });

@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Gửi video đang xem sang Andrew Downloader.",
   "permissions": ["activeTab", "contextMenus", "tabs", "storage"],
+  "host_permissions": ["http://127.0.0.1:32145/*"],
   "background": {
     "service_worker": "service-worker.js"
   },

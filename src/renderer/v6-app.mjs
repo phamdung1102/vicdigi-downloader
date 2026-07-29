@@ -1119,20 +1119,35 @@ const VIC = (() => {
     $('urlInput').value = url;
     syncHeaderInputState();
     showStatus('Đã nhận liên kết từ trình duyệt.', 'ok');
-    await getVideoInfo();
+    const requestId = String(payload.requestId || '');
+    const reportQuickStatus = (state, percent, message = '') => {
+      if (requestId) api?.reportQuickDownloadStatus?.({ requestId, state, percent, message });
+    };
+    reportQuickStatus('starting', 1, 'Đang lấy thông tin video');
+    try {
+      await getVideoInfo();
+    } catch (error) {
+      reportQuickStatus('failed', 0, error?.message || 'Không lấy được thông tin video');
+      return;
+    }
+    if (!videoInfo) {
+      reportQuickStatus('failed', 0, 'Không nhận diện được video');
+      return;
+    }
     if (payload.action === 'download' && videoInfo) {
       let folder = $('folderInput')?.value.trim() || ui.singleFolder || '';
       if (!folder) folder = await api?.getDefaultDownloadFolder?.();
       if ($('folderInput')) $('folderInput').value = folder || '';
       if (folder) await persistUi({ singleFolder: folder });
       showStatus(`Tải nhanh vào: ${folder}`, 'info');
-      await downloadVideo();
+      await downloadVideo(reportQuickStatus);
     }
   }
 
 
 
-  async function downloadVideo() {
+  async function downloadVideo(quickStatusReporter = null) {
+    if (typeof quickStatusReporter !== 'function') quickStatusReporter = null;
     if (!ensureLicenseAccess('tai video')) return;
     const url = $('urlInput').value.trim();
     const folder = $('folderInput').value.trim();
@@ -1146,7 +1161,12 @@ const VIC = (() => {
     $('downloadVideoBtn').disabled = true;
     showProgress(`\u0110ang t\u1ea3i ${format.toUpperCase()} ${quality}...`);
     showStatus('\u0042\u1eaft \u0111\u1ea7u t\u1ea3i video...', 'info');
-    const removeProgress = api?.onDownloadProgress?.(data => setProgress(data.percent || 0));
+    quickStatusReporter?.('downloading', 2, 'Đang bắt đầu tải');
+    const removeProgress = api?.onDownloadProgress?.(data => {
+      const percent = data.percent || 0;
+      setProgress(percent);
+      quickStatusReporter?.('downloading', percent, 'Đang tải');
+    });
     try {
       const clipOptions = getClipOptions();
       const result = await api.downloadVideo({
@@ -1163,10 +1183,12 @@ const VIC = (() => {
       });
       hideProgress();
       showStatus(`T\u1ea3i xong! File: ${result.filePath || folder}`, 'ok');
+      quickStatusReporter?.('completed', 100, 'Tải xong');
       addHistory({ type: 'video', title: videoInfo?.title || url, url, format, quality, folder });
     } catch (error) {
       hideProgress();
       showStatus(error.message, 'err');
+      quickStatusReporter?.('failed', 0, error?.message || 'Tải không thành công');
     } finally {
       syncToolAvailability();
       removeProgress?.();

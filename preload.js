@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readClipboardText: () => invoke('read-clipboard-text'),
   getAppInfo: () => invoke('get-app-info'),
   notifyRendererReady: () => ipcRenderer.send('renderer-ready'),
+  reportQuickDownloadStatus: (payload) => ipcRenderer.send('quick-download-status', payload),
   checkDiskSpace: (folderPath) => invoke('check-disk-space', folderPath),
   openLogsFolder: () => invoke('open-logs-folder'),
   openBrowserExtensionFolder: () => invoke('open-browser-extension-folder'),
