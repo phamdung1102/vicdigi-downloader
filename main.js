@@ -4,7 +4,7 @@
 // ============================================================
 'use strict';
 
-const { app, BrowserWindow, Menu, Notification, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain } = require('electron');
 const path  = require('path');
 const fs    = require('fs-extra');
 const http  = require('http');
@@ -22,6 +22,8 @@ const PROTOCOL_SCHEME = 'andrew-downloader';
 let pendingBrowserUrl = '';
 const quickDownloadStatuses = new Map();
 let quickStatusServer = null;
+let tray = null;
+let isQuitting = false;
 
 function parseProtocolUrl(value) {
   try {
@@ -169,6 +171,12 @@ function createWindow() {
     mainWindow.setMenuBarVisibility(false);
   });
 
+  mainWindow.on('close', event => {
+    if (isQuitting) return;
+    event.preventDefault();
+    mainWindow.hide();
+  });
+
   // Relay renderer console messages
   mainWindow.webContents.on('console-message', (event) => {
     console.log(`[Renderer L${event.level}]`, event.message);
@@ -212,6 +220,7 @@ app.whenReady().then(async () => {
 
   // 2. Tạo window
   createWindow();
+  createTray();
   _setupDlManagerEvents(dlManager);
 
   const { setMainWindow, updateCaps } = require('./src/ipc-handlers');
@@ -259,17 +268,17 @@ app.whenReady().then(async () => {
     }
   }
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+  app.on('activate', showMainWindow);
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  // Tiếp tục chạy trong system tray để nhận lệnh tải từ trình duyệt.
 });
 
 // Dừng các tác vụ đang chạy và chốt snapshot trước khi thoát
 app.on('before-quit', () => {
+  isQuitting = true;
+  try { tray?.destroy(); } catch (_) {}
   try { quickStatusServer?.close(); } catch (_) {}
   try { _dlManagerRef?.shutdown?.(); } catch (_) {}
 });
@@ -307,6 +316,32 @@ function _setupDlManagerEvents(dlManager) {
       }
     });
   }
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray() {
+  if (tray) return;
+  tray = new Tray(path.join(__dirname, 'assets', 'icon.ico'));
+  tray.setToolTip(`Andrew Downloader v${app.getVersion()}`);
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Mở Andrew Downloader', click: showMainWindow },
+    { type: 'separator' },
+    {
+      label: 'Thoát hoàn toàn',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]));
+  tray.on('click', showMainWindow);
+  tray.on('double-click', showMainWindow);
 }
 
 async function _runRendererSmoke(window) {
