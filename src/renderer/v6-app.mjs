@@ -1304,7 +1304,9 @@ const VIC = (() => {
     batchSelected = new Set(batchVideos.map((_, index) => index));
     renderBatch();
     for (const video of batchVideos) {
-      if (!video.title || video.title === video.videoId || /^Facebook Reel/i.test(video.title)) {
+      const needsTitle = !video.title || video.title === video.videoId || /^Facebook Reel/i.test(video.title);
+      const needsThumbnail = !String(video.thumbnail || '').trim();
+      if (needsTitle || needsThumbnail) {
         enqueueFacebookMetadata(video.videoId, video.url, facebookMetadataScanToken);
       }
     }

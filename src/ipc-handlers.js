@@ -368,7 +368,7 @@ function _registerFacebookScanner() {
       return { success: true, ...(await _getFacebookLoginStatus()) };
     }
 
-    _facebookLoginWindow = new BrowserWindow({
+    const loginWindow = new BrowserWindow({
       width: 1100,
       height: 820,
       show: true,
@@ -379,13 +379,40 @@ function _registerFacebookScanner() {
         backgroundThrottling: false,
       },
     });
-    await _facebookLoginWindow.loadURL('https://www.facebook.com/login');
-    return new Promise(resolve => {
-      _facebookLoginWindow.once('closed', async () => {
-        _facebookLoginWindow = null;
-        resolve({ success: true, ...(await _getFacebookLoginStatus()) });
-      });
+    _facebookLoginWindow = loginWindow;
+    const facebookSession = session.fromPartition(FACEBOOK_PARTITION);
+    let settled = false;
+    let finishLogin;
+
+    const completion = new Promise(resolve => {
+      const onCookieChanged = (_event, cookie, _cause, removed) => {
+        if (removed || cookie?.name !== 'c_user' || !cookie?.value) return;
+        if (!/(^|\.)facebook\.com$/i.test(cookie.domain || '')) return;
+        setTimeout(() => finishLogin(true), 250);
+      };
+
+      finishLogin = async closeWindow => {
+        if (settled) return;
+        settled = true;
+        facebookSession.cookies.removeListener('changed', onCookieChanged);
+        const status = await _getFacebookLoginStatus();
+        if (closeWindow && !loginWindow.isDestroyed()) loginWindow.close();
+        if (_facebookLoginWindow === loginWindow) _facebookLoginWindow = null;
+        resolve({ success: true, ...status });
+      };
+
+      facebookSession.cookies.on('changed', onCookieChanged);
+      loginWindow.once('closed', () => finishLogin(false));
     });
+
+    try {
+      await loginWindow.loadURL('https://www.facebook.com/login');
+      const currentStatus = await _getFacebookLoginStatus();
+      if (currentStatus.loggedIn) setTimeout(() => finishLogin(true), 250);
+    } catch (_) {
+      await finishLogin(true);
+    }
+    return completion;
   });
   ipcMain.handle('scan-facebook-page', async (_event, payload = {}) => {
     _requireLicense();

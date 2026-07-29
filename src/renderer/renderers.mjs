@@ -81,16 +81,33 @@ export function renderBatchList(container, videos, selectedIndexes, onToggle, fo
     checkbox.addEventListener('click', event => event.stopPropagation());
     checkbox.addEventListener('change', () => onToggle(index));
 
+    const thumbnailPlaceholder = createNode('div', {
+      className: 'vi-thumb-placeholder',
+      attrs: { 'aria-hidden': 'true' },
+      children: [createNode('span', { className: 'vi-thumb-play' })],
+    });
     const thumbnail = createNode('img', {
       className: 'vi-thumb',
       attrs: {
-        src: video.thumbnail || '',
         alt: '',
         loading: 'lazy',
       },
     });
+    const thumbnailWrap = createNode('div', {
+      className: 'vi-thumb-wrap',
+      children: [thumbnailPlaceholder, thumbnail],
+    });
+    const thumbnailUrl = String(video.thumbnail || '').trim();
+    if (thumbnailUrl) thumbnail.src = thumbnailUrl;
+    else thumbnail.style.display = 'none';
+    thumbnail.addEventListener('load', () => {
+      thumbnail.style.display = 'block';
+      thumbnailPlaceholder.style.display = 'none';
+    });
     thumbnail.addEventListener('error', () => {
+      thumbnail.removeAttribute('src');
       thumbnail.style.display = 'none';
+      thumbnailPlaceholder.style.display = 'grid';
     });
 
     const info = createNode('div', {
@@ -113,7 +130,7 @@ export function renderBatchList(container, videos, selectedIndexes, onToggle, fo
     });
 
     row.appendChild(checkbox);
-    row.appendChild(thumbnail);
+    row.appendChild(thumbnailWrap);
     row.appendChild(info);
     row.appendChild(quality);
     container.appendChild(row);
