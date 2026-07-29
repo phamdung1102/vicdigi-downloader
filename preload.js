@@ -18,9 +18,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── Video info ────────────────────────────────────────────
   getVideoInfo: (url) => invoke('get-video-info', url),
   getVideoInfoMulti: (url) => invoke('get-video-info-multi', url),
+  getPreviewUrl: (url) => invoke('get-preview-url', url),
 
   // ── Download ──────────────────────────────────────────────
   selectDownloadFolder: () => invoke('select-download-folder'),
+  getDefaultDownloadFolder: () => invoke('get-default-download-folder'),
   selectCookieFile: () => invoke('select-cookie-file'),
   downloadVideo: (options) => invoke('download-video', options),
   downloadSubtitle: (options) => invoke('download-subtitle', options),
@@ -33,8 +35,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyText: (text) => invoke('copy-text', text),
   readClipboardText: () => invoke('read-clipboard-text'),
   getAppInfo: () => invoke('get-app-info'),
+  notifyRendererReady: () => ipcRenderer.send('renderer-ready'),
   checkDiskSpace: (folderPath) => invoke('check-disk-space', folderPath),
   openLogsFolder: () => invoke('open-logs-folder'),
+  openBrowserExtensionFolder: () => invoke('open-browser-extension-folder'),
   clearPrivateData: () => invoke('clear-private-data'),
   checkAppUpdate: () => invoke('check-app-update'),
 
@@ -98,6 +102,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const wrapped = (_event, data) => callback(data);
     ipcRenderer.on('facebook-scan-status', wrapped);
     return () => ipcRenderer.removeListener('facebook-scan-status', wrapped);
+  },
+  onBrowserLink: (callback) => {
+    const wrapped = (_event, data) => callback(data);
+    ipcRenderer.on('browser-link-received', wrapped);
+    return () => ipcRenderer.removeListener('browser-link-received', wrapped);
   },
 
   // ── Events: auto-update app (electron-updater) ─────────────

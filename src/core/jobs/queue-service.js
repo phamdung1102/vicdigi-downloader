@@ -164,6 +164,8 @@ class QueueService extends EventBus {
       status: 'queued',
       progress: 0,
       retryCount: 0,
+      clipStartSeconds: downloadInfo.clipStartSeconds,
+      clipEndSeconds: downloadInfo.clipEndSeconds,
       timestamp: Date.now(),
       priority: downloadInfo.priority || 0,
     };

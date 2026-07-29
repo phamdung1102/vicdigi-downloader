@@ -1,0 +1,68 @@
+#andrew-downloader-video-button {
+  all:initial;
+  position:fixed;
+  z-index:2147483647;
+  display:none;
+  align-items:center;
+  gap:7px;
+  height:34px;
+  padding:0 11px 0 5px;
+  border:1px solid rgba(255,255,255,.48);
+  border-radius:9px;
+  background:#56d6ad;
+  color:#07130f;
+  box-shadow:0 6px 22px rgba(0,0,0,.38),0 0 0 2px rgba(0,0,0,.16);
+  backdrop-filter:blur(8px);
+  font:700 12px/1 "Segoe UI",Arial,sans-serif;
+  cursor:pointer;
+  user-select:none;
+  transition:transform .12s ease,background .12s ease,opacity .12s ease;
+}
+#andrew-downloader-video-button:hover {
+  background:#72e6c0;
+  transform:translateY(-1px);
+}
+#andrew-downloader-video-button:active { transform:translateY(0) scale(.98); }
+#andrew-downloader-video-button img {
+  all:initial;
+  width:26px;
+  height:26px;
+  display:block;
+  border-radius:7px;
+  box-shadow:0 1px 5px rgba(0,0,0,.3);
+}
+#andrew-downloader-video-button.andrew-visible { display:flex; }
+
+.andrew-card-download {
+  all:initial;
+  position:absolute;
+  z-index:2147483646;
+  top:9px;
+  right:9px;
+  height:31px;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:0 9px 0 4px;
+  border:1px solid rgba(255,255,255,.5);
+  border-radius:8px;
+  background:#56d6ad;
+  color:#07130f;
+  box-shadow:0 4px 15px rgba(0,0,0,.38),0 0 0 2px rgba(0,0,0,.14);
+  font:700 11px/1 "Segoe UI",Arial,sans-serif;
+  cursor:pointer;
+  opacity:.94;
+  transition:transform .12s ease,background .12s ease,opacity .12s ease;
+}
+.andrew-card-download:hover {
+  background:#72e6c0;
+  opacity:1;
+  transform:translateY(-1px);
+}
+.andrew-card-download img {
+  all:initial;
+  width:23px;
+  height:23px;
+  display:block;
+  border-radius:6px;
+}

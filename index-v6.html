@@ -127,6 +127,15 @@
             <div class="quality-pills" id="qualityPills"></div>
           </div>
         </div>
+        <div class="inline-preview" id="inlinePreview" style="display:none;">
+          <video id="videoPreview" controls preload="metadata"></video>
+          <div class="preview-actions">
+            <button class="btn btn-ghost btn-xs" id="previewCloseBtn">Đóng xem trước</button>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm preview-toggle" id="previewVideoBtn" style="display:none;">
+          Xem trước video
+        </button>
       </div>
 
       <!-- Video download -->
@@ -182,6 +191,24 @@
           <div class="option-checks">
             <label><input type="checkbox" id="embedMetadata" checked /> Nhúng metadata</label>
             <label><input type="checkbox" id="embedThumbnail" /> Nhúng ảnh bìa</label>
+          </div>
+          <div class="clip-options">
+            <label class="clip-enable">
+              <input type="checkbox" id="clipEnabled" />
+              Chỉ tải một đoạn
+            </label>
+            <div class="clip-time-grid" id="clipTimeGrid">
+              <div class="field-wrap">
+                <label class="field-label">Bắt đầu</label>
+                <input class="field" id="clipStart" type="text" inputmode="numeric" placeholder="00:00" />
+              </div>
+              <div class="field-wrap">
+                <label class="field-label">Kết thúc</label>
+                <input class="field" id="clipEnd" type="text" inputmode="numeric" placeholder="01:30" />
+              </div>
+              <button class="btn btn-ghost btn-sm" id="clipUseCurrentBtn" type="button">Lấy mốc đang xem</button>
+            </div>
+            <p class="field-help">Nhập mm:ss hoặc hh:mm:ss. Video được cắt bằng FFmpeg trong lúc tải.</p>
           </div>
         </details>
         <button class="btn btn-primary btn-full" id="downloadVideoBtn" disabled>
@@ -391,6 +418,77 @@
 
       <!-- Danh sách video (ẩn cho tới khi quét/nạp xong) -->
       <div id="videoListSection" style="display:none;">
+        <details class="batch-filter-panel" id="batchFilterPanel">
+          <summary>Bộ lọc danh sách</summary>
+          <div class="batch-filter-grid">
+            <div class="field-wrap filter-wide">
+              <label class="field-label">Tiêu đề có chứa</label>
+              <input class="field" id="batchFilterInclude" type="text" placeholder="Từ khóa bắt buộc" />
+            </div>
+            <div class="field-wrap filter-wide">
+              <label class="field-label">Loại trừ từ khóa</label>
+              <input class="field" id="batchFilterExclude" type="text" placeholder="Nhiều từ, cách nhau bằng dấu phẩy" />
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Thời lượng từ (phút)</label>
+              <input class="field" id="batchFilterMinDuration" type="number" min="0" step="0.5" placeholder="0" />
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Đến (phút)</label>
+              <input class="field" id="batchFilterMaxDuration" type="number" min="0" step="0.5" placeholder="Không giới hạn" />
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Đăng từ ngày</label>
+              <input class="field" id="batchFilterDateFrom" type="date" />
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Đến ngày</label>
+              <input class="field" id="batchFilterDateTo" type="date" />
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Khung hình</label>
+              <select class="field" id="batchFilterOrientation">
+                <option value="all">Tất cả</option>
+                <option value="vertical">Video dọc</option>
+                <option value="horizontal">Video ngang</option>
+                <option value="square">Video vuông</option>
+              </select>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Phụ đề</label>
+              <select class="field" id="batchFilterSubtitles">
+                <option value="all">Tất cả</option>
+                <option value="yes">Có phụ đề</option>
+                <option value="no">Không có phụ đề</option>
+              </select>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Chất lượng tối thiểu</label>
+              <select class="field" id="batchFilterMinQuality">
+                <option value="0">Không giới hạn</option>
+                <option value="720">720p</option>
+                <option value="1080">1080p</option>
+                <option value="1440">1440p</option>
+                <option value="2160">2160p</option>
+              </select>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label">Sắp xếp</label>
+              <select class="field" id="batchFilterSort">
+                <option value="source">Thứ tự nguồn</option>
+                <option value="newest">Mới nhất</option>
+                <option value="oldest">Cũ nhất</option>
+                <option value="duration-desc">Dài nhất</option>
+                <option value="duration-asc">Ngắn nhất</option>
+                <option value="title">Tên A–Z</option>
+              </select>
+            </div>
+          </div>
+          <div class="batch-filter-footer">
+            <span id="batchFilterResult">Hiển thị toàn bộ danh sách</span>
+            <button class="btn btn-ghost btn-xs" id="batchFilterResetBtn" type="button">Xóa bộ lọc</button>
+          </div>
+        </details>
         <div class="select-bar">
           <div class="select-count">Đã chọn: <b id="selCount">0</b> / <b id="totalCount">0</b></div>
           <div style="display:flex;gap:5px;">
@@ -475,6 +573,16 @@
           <p class="settings-note" id="parallelDownloadsNote">
             Chọn số tác vụ được tải cùng lúc. Khuyên dùng 2–3 tác vụ để ổn định.
           </p>
+        </div>
+      </div>
+
+      <div class="ver-box settings-card">
+        <div class="settings-row">
+          <div>
+            <div class="field-label">Tiện ích trình duyệt</div>
+            <div class="settings-note">Gửi trang đang xem từ Chrome hoặc Edge thẳng sang Andrew Downloader.</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="openBrowserExtensionBtn">Mở thư mục cài đặt</button>
         </div>
       </div>
 

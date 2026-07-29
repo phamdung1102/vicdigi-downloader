@@ -75,6 +75,8 @@ async function getYtDlpInfo(url, appDir) {
     platform,
     subtitles: info.subtitles ? Object.keys(info.subtitles) : [],
     autoCaptions: info.automatic_captions ? Object.keys(info.automatic_captions) : [],
+    width: info.width || 0,
+    previewUrl: info.url || null,
   };
 }
 
@@ -105,6 +107,12 @@ async function getYtDlpInfoMulti(url, appDir) {
       container: format.ext,
       filesize: format.filesize ? `${Math.round(format.filesize / 1024 / 1024)}MB` : '?',
     })),
+    videoId: info.id || extractVideoId(url),
+    height: info.height || 0,
+    width: info.width || 0,
+    subtitles: info.subtitles ? Object.keys(info.subtitles) : [],
+    autoCaptions: info.automatic_captions ? Object.keys(info.automatic_captions) : [],
+    previewUrl: info.url || null,
   };
 }
 

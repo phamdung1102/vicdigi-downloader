@@ -8,6 +8,16 @@ const { isPlaceholderTitle, normalizeMediaTitle, sanitizeFilename } = require('.
 
 const reservedOutputNames = new Map();
 
+function buildClipArgs(download) {
+  if (download.clipStartSeconds === undefined && download.clipEndSeconds === undefined) return [];
+  const start = Math.max(0, Number(download.clipStartSeconds) || 0);
+  const end = Number(download.clipEndSeconds);
+  if (!Number.isFinite(end) || end <= start) {
+    throw new Error('Mốc kết thúc phải lớn hơn mốc bắt đầu.');
+  }
+  return ['--download-sections', `*${start}-${end}`, '--force-keyframes-at-cuts'];
+}
+
 function buildSocialMethods(baseArgs, context, options = {}) {
   const {
     includeNoCookies = true,
@@ -300,6 +310,7 @@ function resolveCookieFile(context) {
 }
 
 module.exports = {
+  buildClipArgs,
   buildSocialMethods,
   resolveOutputTemplate,
   trySocialDownload,

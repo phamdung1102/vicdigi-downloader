@@ -1,5 +1,9 @@
 appId: com.vicdigi.downloader
 productName: Andrew Downloader
+protocols:
+  - name: Andrew Downloader Link
+    schemes:
+      - andrew-downloader
 copyright: Copyright © 2024-2026 Andrew Phạm
 
 directories:
@@ -44,6 +48,8 @@ files:
 
 # yt-dlp.exe & ffmpeg.exe ngoài asar -> resources/
 extraResources:
+  - from: "browser-extension"
+    to: "browser-extension"
   - from: "yt-dlp.exe"
     to: "yt-dlp.exe"
   - from: "ffmpeg.exe"

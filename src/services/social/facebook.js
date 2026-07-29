@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildSocialMethods, resolveOutputTemplate, trySocialDownload } = require('./shared');
+const { buildClipArgs, buildSocialMethods, resolveOutputTemplate, trySocialDownload } = require('./shared');
 
 async function downloadFacebook(download, context) {
   const baseArgs = [
@@ -8,6 +8,7 @@ async function downloadFacebook(download, context) {
     '--output', resolveOutputTemplate(download),
     '--no-check-certificates',
     '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    ...buildClipArgs(download),
     download.url,
   ];
 

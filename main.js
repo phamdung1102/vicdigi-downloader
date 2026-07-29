@@ -4,7 +4,7 @@
 // ============================================================
 'use strict';
 
-const { app, BrowserWindow, Menu, Notification } = require('electron');
+const { app, BrowserWindow, Menu, Notification, ipcMain } = require('electron');
 const path  = require('path');
 const fs    = require('fs-extra');
 const Store = require('electron-store');
@@ -17,6 +17,56 @@ const { setupAutoUpdater } = require('./src/app-updater');
 // ── Persistent store (replaces localStorage) ─────────────────
 const store = new Store();
 const IS_SMOKE_RENDERER = process.argv.includes('--smoke-renderer');
+const PROTOCOL_SCHEME = 'andrew-downloader';
+let pendingBrowserUrl = '';
+
+function parseProtocolUrl(value) {
+  try {
+    const parsed = new URL(String(value || ''));
+    if (parsed.protocol !== `${PROTOCOL_SCHEME}:`) return '';
+    const target = parsed.searchParams.get('url') || '';
+    if (!/^https?:\/\//i.test(target)) return null;
+    return {
+      url: target,
+      action: parsed.hostname === 'download' || parsed.searchParams.get('action') === 'download' ? 'download' : 'open',
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function findProtocolArgument(argv = []) {
+  return argv.map(parseProtocolUrl).find(Boolean) || null;
+}
+
+function deliverBrowserUrl(payload) {
+  if (!payload?.url) return;
+  if (
+    !rendererReady ||
+    !engineReady ||
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    mainWindow.webContents.isLoading()
+  ) {
+    pendingBrowserUrl = payload;
+    return;
+  }
+  if (payload.action !== 'download') {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  mainWindow.webContents.send('browser-link-received', payload);
+}
+
+if (!IS_SMOKE_RENDERER) {
+  const hasLock = app.requestSingleInstanceLock();
+  if (!hasLock) {
+    app.quit();
+  } else {
+    app.on('second-instance', (_event, argv) => deliverBrowserUrl(findProtocolArgument(argv)));
+  }
+}
 
 // ── Add app folder to PATH so bundled exes are found ─────────
 function _patchPath() {
@@ -38,6 +88,20 @@ process.on('unhandledRejection', (reason) => {
 // ── Create BrowserWindow ──────────────────────────────────────
 let mainWindow;
 let _dlManagerRef = null;
+let rendererReady = false;
+let engineReady = false;
+
+function flushPendingBrowserUrl() {
+  if (!rendererReady || !engineReady || !pendingBrowserUrl) return;
+  const payload = pendingBrowserUrl;
+  pendingBrowserUrl = '';
+  deliverBrowserUrl(payload);
+}
+
+ipcMain.on('renderer-ready', () => {
+  rendererReady = true;
+  flushPendingBrowserUrl();
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -67,7 +131,7 @@ function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => {
-    if (!IS_SMOKE_RENDERER) mainWindow.show();
+    if (!IS_SMOKE_RENDERER && pendingBrowserUrl?.action !== 'download') mainWindow.show();
     mainWindow.setMenuBarVisibility(false);
   });
 
@@ -90,6 +154,14 @@ function createWindow() {
 
 // ── App lifecycle ─────────────────────────────────────────────
 app.whenReady().then(async () => {
+  if (!IS_SMOKE_RENDERER) {
+    if (process.defaultApp && process.argv[1]) {
+      app.setAsDefaultProtocolClient(PROTOCOL_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+    } else {
+      app.setAsDefaultProtocolClient(PROTOCOL_SCHEME);
+    }
+    pendingBrowserUrl = findProtocolArgument(process.argv);
+  }
   _patchPath();
   Menu.setApplicationMenu(null);
 
@@ -115,6 +187,8 @@ app.whenReady().then(async () => {
 
   // 4. Cập nhật caps vào handlers ngay
   updateCaps(capabilities);
+  engineReady = true;
+  flushPendingBrowserUrl();
 
   mainWindow.setTitle(`Andrew Downloader v${app.getVersion()}`);
 

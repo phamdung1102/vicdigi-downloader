@@ -19,11 +19,99 @@ export function createBatchController(deps) {
     ensureBatchAccess,
   } = deps;
 
+  function getFilterValue(id) {
+    return String($(id)?.value || '').trim();
+  }
+
+  function parseUploadDate(value) {
+    const text = String(value || '').trim();
+    if (!text) return 0;
+    if (/^\d{8}$/.test(text)) {
+      return new Date(`${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}T00:00:00`).getTime();
+    }
+    const parsed = new Date(text).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function getFilteredBatchEntries() {
+    const { batchVideos } = getState();
+    const include = getFilterValue('batchFilterInclude').toLocaleLowerCase('vi');
+    const excluded = getFilterValue('batchFilterExclude')
+      .split(',')
+      .map(value => value.trim().toLocaleLowerCase('vi'))
+      .filter(Boolean);
+    const minDuration = Number(getFilterValue('batchFilterMinDuration')) * 60 || 0;
+    const maxDurationInput = Number(getFilterValue('batchFilterMaxDuration'));
+    const maxDuration = maxDurationInput > 0 ? maxDurationInput * 60 : Infinity;
+    const dateFrom = getFilterValue('batchFilterDateFrom')
+      ? new Date(`${getFilterValue('batchFilterDateFrom')}T00:00:00`).getTime()
+      : 0;
+    const dateTo = getFilterValue('batchFilterDateTo')
+      ? new Date(`${getFilterValue('batchFilterDateTo')}T23:59:59`).getTime()
+      : Infinity;
+    const orientation = getFilterValue('batchFilterOrientation') || 'all';
+    const subtitleFilter = getFilterValue('batchFilterSubtitles') || 'all';
+    const minQuality = Number(getFilterValue('batchFilterMinQuality')) || 0;
+    const sort = getFilterValue('batchFilterSort') || 'source';
+
+    const entries = batchVideos.map((video, sourceIndex) => ({ video, sourceIndex })).filter(({ video }) => {
+      const title = String(video.title || '').toLocaleLowerCase('vi');
+      if (include && !title.includes(include)) return false;
+      if (excluded.some(keyword => title.includes(keyword))) return false;
+
+      const duration = Number(video.duration || 0);
+      if (duration && (duration < minDuration || duration > maxDuration)) return false;
+      if (!duration && (minDuration > 0 || Number.isFinite(maxDuration))) return false;
+
+      const uploadDate = parseUploadDate(video.uploadDate);
+      if (uploadDate && (uploadDate < dateFrom || uploadDate > dateTo)) return false;
+      if (!uploadDate && (dateFrom > 0 || Number.isFinite(dateTo))) return false;
+
+      const width = Number(video.width || 0);
+      const height = Number(video.height || 0);
+      if (orientation !== 'all') {
+        if (!width || !height) return false;
+        const ratio = width / height;
+        if (orientation === 'vertical' && ratio >= 0.9) return false;
+        if (orientation === 'horizontal' && ratio <= 1.1) return false;
+        if (orientation === 'square' && (ratio < 0.9 || ratio > 1.1)) return false;
+      }
+
+      const hasSubtitles = Boolean(video.hasSubtitles || video.subtitles?.length || video.autoCaptions?.length);
+      if (subtitleFilter === 'yes' && !hasSubtitles) return false;
+      if (subtitleFilter === 'no' && hasSubtitles) return false;
+      if (Number(video.maxQuality || video.height || 0) < minQuality) return false;
+      return true;
+    });
+
+    const sorters = {
+      newest: (a, b) => parseUploadDate(b.video.uploadDate) - parseUploadDate(a.video.uploadDate),
+      oldest: (a, b) => parseUploadDate(a.video.uploadDate) - parseUploadDate(b.video.uploadDate),
+      'duration-desc': (a, b) => Number(b.video.duration || 0) - Number(a.video.duration || 0),
+      'duration-asc': (a, b) => Number(a.video.duration || 0) - Number(b.video.duration || 0),
+      title: (a, b) => String(a.video.title || '').localeCompare(String(b.video.title || ''), 'vi'),
+    };
+    if (sorters[sort]) entries.sort(sorters[sort]);
+    return entries;
+  }
+
   function renderBatch() {
     const { batchVideos, batchSelected } = getState();
-    $('totalCount').textContent = batchVideos.length;
+    const entries = getFilteredBatchEntries();
+    $('totalCount').textContent = entries.length;
+    if ($('batchFilterResult')) {
+      $('batchFilterResult').textContent = entries.length === batchVideos.length
+        ? `Hiển thị toàn bộ ${batchVideos.length} video`
+        : `Hiển thị ${entries.length} / ${batchVideos.length} video`;
+    }
     updateBatchCount();
-    renderBatchList($('videoGrid'), batchVideos, batchSelected, toggleBatchSelection, formatDuration);
+    renderBatchList(
+      $('videoGrid'),
+      entries.map(entry => entry.video),
+      new Set(entries.map((entry, displayIndex) => batchSelected.has(entry.sourceIndex) ? displayIndex : -1).filter(index => index >= 0)),
+      displayIndex => toggleBatchSelection(entries[displayIndex]?.sourceIndex),
+      formatDuration,
+    );
   }
 
   function toggleBatchSelection(index) {
@@ -43,12 +131,31 @@ export function createBatchController(deps) {
 
   function batchSelectAll() {
     const state = getState();
-    state.batchVideos.forEach((_, index) => state.batchSelected.add(index));
+    getFilteredBatchEntries().forEach(entry => state.batchSelected.add(entry.sourceIndex));
     renderBatch();
   }
 
   function batchDeselectAll() {
-    getState().batchSelected.clear();
+    const state = getState();
+    getFilteredBatchEntries().forEach(entry => state.batchSelected.delete(entry.sourceIndex));
+    renderBatch();
+  }
+
+  function resetFilters() {
+    [
+      'batchFilterInclude', 'batchFilterExclude', 'batchFilterMinDuration',
+      'batchFilterMaxDuration', 'batchFilterDateFrom', 'batchFilterDateTo',
+    ].forEach(id => { if ($(id)) $(id).value = ''; });
+    ['batchFilterOrientation', 'batchFilterSubtitles'].forEach(id => { if ($(id)) $(id).value = 'all'; });
+    if ($('batchFilterMinQuality')) $('batchFilterMinQuality').value = '0';
+    if ($('batchFilterSort')) $('batchFilterSort').value = 'source';
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const state = getState();
+    state.batchSelected.clear();
+    getFilteredBatchEntries().forEach(entry => state.batchSelected.add(entry.sourceIndex));
     renderBatch();
   }
 
@@ -287,6 +394,11 @@ export function createBatchController(deps) {
             maxQuality: getMaxQualityFromInfo(info, current.maxQuality),
             videoId: info.videoId || current.videoId,
             platform: info.platform || current.platform,
+            uploadDate: info.uploadDate || current.uploadDate || '',
+            width: info.width || current.width || 0,
+            height: info.height || current.height || 0,
+            subtitles: info.subtitles || current.subtitles || [],
+            autoCaptions: info.autoCaptions || current.autoCaptions || [],
           };
           resolvedCount += 1;
         }
@@ -365,5 +477,7 @@ export function createBatchController(deps) {
     showResultModal,
     closeResultModal,
     openResultFolder,
+    applyFilters,
+    resetFilters,
   };
 }

@@ -100,6 +100,15 @@ async function realDownload(url, outputPath, format, quality, onProgress, appDir
       if (options.embedMetadata !== false) args.push('--embed-metadata');
       if (options.embedThumbnail) args.push('--write-thumbnail', '--embed-thumbnail');
     }
+    if (options.clipStartSeconds !== undefined || options.clipEndSeconds !== undefined) {
+      const start = Math.max(0, Number(options.clipStartSeconds) || 0);
+      const end = Number(options.clipEndSeconds);
+      if (!Number.isFinite(end) || end <= start) {
+        reject(new Error('Mốc kết thúc phải lớn hơn mốc bắt đầu.'));
+        return;
+      }
+      args.push('--download-sections', `*${start}-${end}`, '--force-keyframes-at-cuts');
+    }
     args.push(url);
 
     const process = spawnYtDlp(args, { appDir });

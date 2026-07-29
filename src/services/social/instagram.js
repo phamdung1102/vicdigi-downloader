@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildSocialMethods, resolveOutputTemplate, trySocialDownload } = require('./shared');
+const { buildClipArgs, buildSocialMethods, resolveOutputTemplate, trySocialDownload } = require('./shared');
 
 async function downloadInstagram(download, context) {
   const baseArgs = [
@@ -10,6 +10,7 @@ async function downloadInstagram(download, context) {
     '--no-check-certificates',
     '--age-limit', '99',
     '--user-agent', 'Instagram 219.0.0.12.117 Android',
+    ...buildClipArgs(download),
     download.url,
   ];
 

@@ -22,6 +22,7 @@ const { trackActivation, trackDailyHeartbeat, requestOnlineLicense } = require('
 const { checkUpdate, downloadUpdate } = require('./ytdlp-updater');
 const { checkAppUpdates } = require('./app-updater');
 const { recordYtDlpError } = require('./diagnostics');
+const { runYtDlp, withCommonArgs } = require('./ytdlp-client');
 const DownloadManager = require('../download-manager');
 
 let _mainWindow   = null;
@@ -101,9 +102,25 @@ function _registerVideo() {
     return getVideoInfoMulti(cleanUrl, _caps, _appDir);
   });
 
+  ipcMain.handle('get-preview-url', async (_e, url) => {
+    _requireLicense();
+    const cleanUrl = String(url || '').trim();
+    if (!/^https?:\/\//i.test(cleanUrl)) throw new Error('URL xem trước không hợp lệ.');
+    const args = withCommonArgs([
+      '--get-url',
+      '--format', 'best[ext=mp4][vcodec!=none][acodec!=none]/best[ext=mp4]/best',
+      '--no-playlist',
+      cleanUrl,
+    ]);
+    const { stdout } = await runYtDlp(args, { appDir: _appDir, timeoutMs: 30000 });
+    const previewUrl = stdout.split(/\r?\n/).map(value => value.trim()).find(value => /^https?:\/\//i.test(value));
+    if (!previewUrl) throw new Error('Nguồn này không cung cấp luồng xem trước.');
+    return { success: true, url: previewUrl };
+  });
+
   ipcMain.handle('download-video', async (event, opts) => {
     _requireLicense();
-    const { url, outputPath, format, quality, title, filenameTemplate, conflictPolicy, embedMetadata, embedThumbnail } = opts;
+    const { url, outputPath, format, quality, title, filenameTemplate, conflictPolicy, embedMetadata, embedThumbnail, clipStartSeconds, clipEndSeconds } = opts;
     if (!url || !outputPath) throw new Error('url và outputPath là bắt buộc');
 
     const platform = DownloadManager.detectPlatform(url);
@@ -118,6 +135,8 @@ function _registerVideo() {
         quality,
         platform,
         title: title || `${platform}_${Date.now()}`,
+        clipStartSeconds,
+        clipEndSeconds,
       });
     }
 
@@ -127,6 +146,7 @@ function _registerVideo() {
 
     return downloadVideo({
       url, outputPath, format, quality, filenameTemplate, conflictPolicy, embedMetadata, embedThumbnail,
+      clipStartSeconds, clipEndSeconds,
     }, onProgress, _caps, _appDir);
   });
 }
@@ -413,6 +433,15 @@ function _registerFacebookScanner() {
       await finishLogin(true);
     }
     return completion;
+  });
+  ipcMain.handle('get-default-download-folder', () => app.getPath('downloads'));
+  ipcMain.handle('open-browser-extension-folder', async () => {
+    const extensionPath = require('path').join(_appDir, 'browser-extension');
+    if (!(await fs.pathExists(extensionPath))) {
+      return { success: false, error: 'Không tìm thấy thư mục tiện ích trình duyệt.' };
+    }
+    await shell.openPath(extensionPath);
+    return { success: true, path: extensionPath };
   });
   ipcMain.handle('scan-facebook-page', async (_event, payload = {}) => {
     _requireLicense();

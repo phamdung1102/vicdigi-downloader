@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildSocialMethods, resolveOutputTemplate, trySocialDownload } = require('./shared');
+const { buildClipArgs, buildSocialMethods, resolveOutputTemplate, trySocialDownload } = require('./shared');
 
 async function downloadTikTok(download, context) {
   const outputTemplate = resolveOutputTemplate(download);
@@ -14,6 +14,7 @@ async function downloadTikTok(download, context) {
         '--extractor-args', `tiktok:app_info=${mobileAppInfo}`,
         '--output', outputTemplate,
         '--no-check-certificates',
+        ...buildClipArgs(download),
         download.url,
       ],
     },
@@ -23,6 +24,7 @@ async function downloadTikTok(download, context) {
       '--no-check-certificates',
       '--referer', 'https://www.tiktok.com/',
       '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
+      ...buildClipArgs(download),
       download.url,
     ], context),
   ];

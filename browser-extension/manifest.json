@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Andrew Downloader",
+  "version": "1.0.0",
+  "description": "Gửi video đang xem sang Andrew Downloader.",
+  "permissions": ["activeTab", "contextMenus", "tabs", "storage"],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_title": "Andrew Downloader",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["video-button.js"],
+      "css": ["video-button.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icon32.png"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ]
+}

@@ -85,6 +85,7 @@ const VIC = (() => {
       await loadLicenseStatus();
       await loadAppInfo();
       wireEvents();
+      api?.notifyRendererReady?.();
       applyTheme(ui.theme);
       applyUi();
       applySocialCookiePath();
@@ -119,8 +120,16 @@ const VIC = (() => {
     on('selectCookieFileBtn', 'click', selectCookieFile);
     on('clearCookieFileBtn', 'click', clearCookieFile);
     on('openLogsBtn', 'click', () => api?.openLogsFolder?.());
+    on('openBrowserExtensionBtn', 'click', async () => {
+      const result = await api?.openBrowserExtensionFolder?.();
+      showStatus(result?.success ? 'Đã mở thư mục tiện ích. Chọn thư mục này trong trang Extensions của trình duyệt.' : (result?.error || 'Không mở được thư mục tiện ích.'), result?.success ? 'ok' : 'warn');
+    });
     on('clearPrivateDataBtn', 'click', clearPrivateData);
     on('downloadVideoBtn', 'click', downloadVideo);
+    on('previewVideoBtn', 'click', toggleVideoPreview);
+    on('previewCloseBtn', 'click', closeVideoPreview);
+    on('clipEnabled', 'change', syncClipOptions);
+    on('clipUseCurrentBtn', 'click', useCurrentPreviewTime);
     on('downloadSubtitleBtn', 'click', downloadSubtitle);
     on('downloadThumbnailBtn', 'click', downloadThumbnail);
     on('selectBatchFolderBtn', 'click', selectBatchFolder);
@@ -147,6 +156,7 @@ const VIC = (() => {
     on('batchFilePickerBtn', 'click', () => $('batchFileInput')?.click());
     on('batchSelectAllBtn', 'click', batchSelectAll);
     on('batchDeselectAllBtn', 'click', batchDeselectAll);
+    on('batchFilterResetBtn', 'click', () => batchController?.resetFilters?.());
     on('openDownloadCenterBtn', 'click', openDownloadCenterModal);
     on('refreshDownloadCenterBtn', 'click', refreshDownloadCenter);
     on('profileSelect', 'change', onProfileSelected);
@@ -185,6 +195,15 @@ const VIC = (() => {
     });
     $('batchLinksInput')?.addEventListener('input', () => $('linkCount').textContent = `${$('batchLinksInput').value.split('\n').filter(line => line.trim().startsWith('http')).length} URL`);
     $('batchFileInput')?.addEventListener('change', event => loadLinksFromFile(event.target));
+    [
+      'batchFilterInclude', 'batchFilterExclude', 'batchFilterMinDuration',
+      'batchFilterMaxDuration', 'batchFilterDateFrom', 'batchFilterDateTo',
+      'batchFilterOrientation', 'batchFilterSubtitles', 'batchFilterMinQuality', 'batchFilterSort',
+    ].forEach(id => {
+      $(id)?.addEventListener(['INPUT', 'TEXTAREA'].includes($(id)?.tagName) ? 'input' : 'change', () => {
+        batchController?.applyFilters?.();
+      });
+    });
     bindUiField('maxVideos', 'maxVideos', value => {
       const parsed = parseInt(value, 10);
       return Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), MAX_BATCH_VIDEOS) : DEFAULTS.maxVideos;
@@ -201,6 +220,7 @@ const VIC = (() => {
     api?.onAppUpdateStatus?.(handleAppUpdateStatus);
     api?.onFacebookUidsDiscovered?.(handleFacebookUidsDiscovered);
     api?.onFacebookScanStatus?.(handleFacebookScanStatus);
+    api?.onBrowserLink?.(handleBrowserLink);
     wireDownloadCenterEvents();
   }
 
@@ -220,6 +240,7 @@ const VIC = (() => {
   }
 
   function applyUi() {
+    setValue('folderInput', ui.singleFolder || '');
     setValue('maxVideos', String(ui.maxVideos));
     setValue('parallelDownloads', String(ui.parallelDownloads || DEFAULTS.parallelDownloads));
     setValue('batchFormat', ui.batchFormat);
@@ -892,7 +913,13 @@ const VIC = (() => {
     maybeShowDeferredUpdatePrompt();
   }
   function setProgress(percent) { const safe = Math.max(0, Math.min(100, Math.round(percent || 0))); if ($('progressFill')) $('progressFill').style.width = `${safe}%`; if ($('progressPct')) $('progressPct').textContent = `${safe}%`; }
-  async function selectFolder() { const folder = await api?.selectDownloadFolder?.(); if (folder) $('folderInput').value = folder; }
+  async function selectFolder() {
+    const folder = await api?.selectDownloadFolder?.();
+    if (folder) {
+      $('folderInput').value = folder;
+      await persistUi({ singleFolder: folder });
+    }
+  }
 
 
   async function selectCookieFile() {
@@ -999,6 +1026,108 @@ const VIC = (() => {
     if (info.height) { $('metaMaxQ').textContent = `Tối đa ${info.height}p`; $('metaMaxQ').style.display = 'inline-flex'; } else $('metaMaxQ').style.display = 'none';
     if (info.platform && !['youtube', 'unknown'].includes(info.platform)) { $('metaPlatform').textContent = info.platform; $('metaPlatform').style.display = 'inline-flex'; } else $('metaPlatform').style.display = 'none';
     renderQualityPills($('qualityPills'), info.formats || []);
+    if ($('previewVideoBtn')) $('previewVideoBtn').style.display = /^https?:\/\//i.test($('urlInput')?.value || '') ? 'inline-flex' : 'none';
+    closeVideoPreview();
+  }
+
+  async function toggleVideoPreview() {
+    const preview = $('videoPreview');
+    const panel = $('inlinePreview');
+    if (!preview || !panel) return;
+    if (panel.style.display !== 'none') return closeVideoPreview();
+    const button = $('previewVideoBtn');
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Đang mở xem trước…';
+    }
+    try {
+      const result = videoInfo?.previewUrl
+        ? { success: true, url: videoInfo.previewUrl }
+        : await api?.getPreviewUrl?.($('urlInput')?.value.trim());
+      if (!result?.success || !result.url) throw new Error(result?.error || 'Không lấy được luồng xem trước.');
+      videoInfo.previewUrl = result.url;
+      preview.src = result.url;
+      panel.style.display = 'block';
+      preview.play().catch(() => {});
+    } catch (error) {
+      showStatus(error.message || 'Nguồn này không hỗ trợ xem trước.', 'warn');
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Xem trước video';
+      }
+    }
+  }
+
+  function closeVideoPreview() {
+    const preview = $('videoPreview');
+    if (preview) {
+      preview.pause();
+      preview.removeAttribute('src');
+      preview.load();
+    }
+    if ($('inlinePreview')) $('inlinePreview').style.display = 'none';
+  }
+
+  function syncClipOptions() {
+    document.querySelector('.clip-options')?.classList.toggle('enabled', Boolean($('clipEnabled')?.checked));
+  }
+
+  function formatClipTime(totalSeconds) {
+    const total = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    return hours
+      ? [hours, minutes, seconds].map(value => String(value).padStart(2, '0')).join(':')
+      : [minutes, seconds].map(value => String(value).padStart(2, '0')).join(':');
+  }
+
+  function parseClipTime(value) {
+    const parts = String(value || '').trim().split(':').map(Number);
+    if (!parts.length || parts.some(part => !Number.isFinite(part) || part < 0)) return null;
+    if (parts.length === 1) return parts[0];
+    if (parts.length === 2 && parts[1] < 60) return parts[0] * 60 + parts[1];
+    if (parts.length === 3 && parts[1] < 60 && parts[2] < 60) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return null;
+  }
+
+  function useCurrentPreviewTime() {
+    const preview = $('videoPreview');
+    if (!preview || !Number.isFinite(preview.currentTime)) return;
+    const target = !$('clipStart')?.value ? $('clipStart') : $('clipEnd');
+    if (target) target.value = formatClipTime(preview.currentTime);
+  }
+
+  function getClipOptions() {
+    if (!$('clipEnabled')?.checked) return {};
+    const start = parseClipTime($('clipStart')?.value);
+    const end = parseClipTime($('clipEnd')?.value);
+    if (start === null || end === null || end <= start) {
+      throw new Error('Mốc cắt không hợp lệ. Kết thúc phải lớn hơn bắt đầu.');
+    }
+    if (videoInfo?.duration && end > Number(videoInfo.duration) + 1) {
+      throw new Error('Mốc kết thúc vượt quá thời lượng video.');
+    }
+    return { clipStartSeconds: start, clipEndSeconds: end };
+  }
+
+  async function handleBrowserLink(payload = {}) {
+    const url = String(payload.url || '').trim();
+    if (!/^https?:\/\//i.test(url)) return;
+    switchTab('single');
+    $('urlInput').value = url;
+    syncHeaderInputState();
+    showStatus('Đã nhận liên kết từ trình duyệt.', 'ok');
+    await getVideoInfo();
+    if (payload.action === 'download' && videoInfo) {
+      let folder = $('folderInput')?.value.trim() || ui.singleFolder || '';
+      if (!folder) folder = await api?.getDefaultDownloadFolder?.();
+      if ($('folderInput')) $('folderInput').value = folder || '';
+      if (folder) await persistUi({ singleFolder: folder });
+      showStatus(`Tải nhanh vào: ${folder}`, 'info');
+      await downloadVideo();
+    }
   }
 
 
@@ -1019,6 +1148,7 @@ const VIC = (() => {
     showStatus('\u0042\u1eaft \u0111\u1ea7u t\u1ea3i video...', 'info');
     const removeProgress = api?.onDownloadProgress?.(data => setProgress(data.percent || 0));
     try {
+      const clipOptions = getClipOptions();
       const result = await api.downloadVideo({
         url,
         outputPath: folder,
@@ -1029,6 +1159,7 @@ const VIC = (() => {
         conflictPolicy: $('fileConflictPolicy')?.value || 'rename',
         embedMetadata: $('embedMetadata')?.checked !== false,
         embedThumbnail: Boolean($('embedThumbnail')?.checked),
+        ...clipOptions,
       });
       hideProgress();
       showStatus(`T\u1ea3i xong! File: ${result.filePath || folder}`, 'ok');
@@ -1145,6 +1276,11 @@ const VIC = (() => {
       views: 0,
       thumbnail: item.thumbnail || '',
       maxQuality: item.maxQuality || 1080,
+      uploadDate: item.uploadDate || '',
+      width: Number(item.width || 0),
+      height: Number(item.height || 0),
+      subtitles: item.subtitles || [],
+      autoCaptions: item.autoCaptions || [],
       manualUrl: true,
     };
   }
@@ -1223,6 +1359,11 @@ const VIC = (() => {
         maxQuality: getMaxQualityFromInfo(info, current.maxQuality),
         videoId: info.videoId || current.videoId,
         platform: info.platform || current.platform || 'facebook',
+        uploadDate: info.uploadDate || current.uploadDate || '',
+        width: info.width || current.width || 0,
+        height: info.height || current.height || 0,
+        subtitles: info.subtitles || current.subtitles || [],
+        autoCaptions: info.autoCaptions || current.autoCaptions || [],
       };
       renderBatch();
     } catch (_) {
