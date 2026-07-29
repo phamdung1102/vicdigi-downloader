@@ -8,6 +8,8 @@ const { execFileSync } = require('child_process');
 const { APP_ID, base64UrlDecode, parseToken } = require('./license-token');
 
 const LICENSE_STORE_KEY = 'license.activation';
+const TRIAL_STORE_KEY = 'license.trial';
+const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
 const PUBLIC_KEY_PATH = path.join(__dirname, '..', '..', '..', 'config', 'license-public.pem');
 const PLACEHOLDER_MARKER = 'REPLACE_WITH_YOUR_BASE64_PUBLIC_KEY';
 
@@ -51,17 +53,7 @@ class LicenseService {
       };
     }
 
-    if (!stored?.rawKey) {
-      return {
-        activated: false,
-        valid: false,
-        configured: true,
-        machineId,
-        status: 'inactive',
-        license: null,
-        message: 'Chua kich hoat app tren may nay.',
-      };
-    }
+    if (!stored?.rawKey) return this.getTrialStatus(machineId);
 
     return this.verifyLicenseKey(stored.rawKey, { machineId, publicKey });
   }
@@ -99,6 +91,57 @@ class LicenseService {
     this.store?.delete?.(LICENSE_STORE_KEY);
     this._invalidateStatusCache();
     return this.getStatus();
+  }
+
+  getTrialStatus(machineId = this.getMachineId()) {
+    const now = Date.now();
+    let trial = this.store?.get?.(TRIAL_STORE_KEY) || null;
+    const startedAt = Date.parse(trial?.startedAt || '');
+    const lastSeenAt = Date.parse(trial?.lastSeenAt || '');
+    const belongsToMachine = trial?.machineId === machineId;
+
+    if (!trial || !Number.isFinite(startedAt) || !belongsToMachine) {
+      trial = {
+        machineId,
+        startedAt: new Date(now).toISOString(),
+        lastSeenAt: new Date(now).toISOString(),
+      };
+      this.store?.set?.(TRIAL_STORE_KEY, trial);
+    } else if (Number.isFinite(lastSeenAt) && now < lastSeenAt - 5 * 60 * 1000) {
+      trial.clockRollbackDetected = true;
+      this.store?.set?.(TRIAL_STORE_KEY, trial);
+    } else {
+      trial.lastSeenAt = new Date(Math.max(now, lastSeenAt || now)).toISOString();
+      this.store?.set?.(TRIAL_STORE_KEY, trial);
+    }
+
+    const trialStartedAt = Date.parse(trial.startedAt);
+    const expiresAtMs = trialStartedAt + TRIAL_DURATION_MS;
+    const valid = !trial.clockRollbackDetected && now < expiresAtMs;
+    return {
+      activated: false,
+      valid,
+      configured: true,
+      machineId,
+      status: valid ? 'trial' : 'trial-expired',
+      license: {
+        customerName: 'Dùng thử 3 ngày',
+        email: '',
+        plan: 'trial-3-days',
+        issuedAt: new Date(trialStartedAt).toISOString(),
+        expiresAt: new Date(expiresAtMs).toISOString(),
+        machineId,
+        features: ['all'],
+      },
+      trial: {
+        startedAt: new Date(trialStartedAt).toISOString(),
+        expiresAt: new Date(expiresAtMs).toISOString(),
+        remainingMs: Math.max(0, expiresAtMs - now),
+      },
+      message: valid
+        ? 'Đang dùng thử đầy đủ tính năng trong 3 ngày.'
+        : (trial.clockRollbackDetected ? 'Dùng thử đã khóa do thời gian hệ thống bị thay đổi.' : 'Thời gian dùng thử 3 ngày đã kết thúc.'),
+    };
   }
 
   verifyLicenseKey(rawKey, { machineId, publicKey } = {}) {

@@ -1236,6 +1236,29 @@ select.field {
 .settings-card .btn-sm {
   min-height: 30px;
 }
+.extension-guide {
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid var(--border);
+  color:var(--txt-mid);
+  font-size:12px;
+  line-height:1.55;
+}
+.extension-guide summary {
+  color:var(--txt-hi);
+  font-weight:700;
+  cursor:pointer;
+}
+.extension-guide ol { margin:9px 0 7px 20px; padding:0; }
+.extension-guide li { margin:4px 0; }
+.extension-guide p { margin:7px 0 0; }
+.extension-guide code {
+  padding:1px 5px;
+  border:1px solid var(--border);
+  border-radius:5px;
+  background:var(--s3);
+  color:var(--accent);
+}
 
 .settings-row {
   display: flex;

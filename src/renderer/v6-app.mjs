@@ -41,7 +41,7 @@ const VIC = (() => {
   const setValue = (id, value) => { if ($(id) && value !== undefined && value !== null) $(id).value = value; };
   const isCustomProfile = profile => Boolean(profile?.isCustom || String(profile?.id || '').startsWith('custom-'));
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-  const isLicenseActive = () => licenseStatus?.status === 'active';
+  const isLicenseActive = () => Boolean(licenseStatus?.valid);
   const storeGet = async key => { try { return await api?.storeGet?.(key); } catch (_) { return null; } };
   const parseStored = value => {
     if (!value) return {};
@@ -594,6 +594,12 @@ const VIC = (() => {
     if (!licenseStatus) return TEXT.license.inactive;
     if (licenseStatus.status === 'unconfigured') return TEXT.license.unconfigured;
     if (licenseStatus.status === 'inactive') return TEXT.license.inactive;
+    if (licenseStatus.status === 'trial') {
+      return `Đang dùng thử đầy đủ - hết hạn ${formatLicenseDate(licenseStatus.license?.expiresAt)}`;
+    }
+    if (licenseStatus.status === 'trial-expired') {
+      return 'Dùng thử 3 ngày đã kết thúc';
+    }
     if (licenseStatus.status === 'expired') {
       return TEXT.license.expired(formatLicenseDate(licenseStatus.license?.expiresAt));
     }
@@ -609,6 +615,8 @@ const VIC = (() => {
   function getLicenseStateLabel() {
     if (!licenseStatus) return TEXT.license.stateInactive;
     if (licenseStatus.status === 'active') return TEXT.license.stateActive;
+    if (licenseStatus.status === 'trial') return 'Dùng thử';
+    if (licenseStatus.status === 'trial-expired') return 'Hết dùng thử';
     if (licenseStatus.status === 'expired') return TEXT.license.stateExpired;
     if (licenseStatus.status === 'unconfigured') return TEXT.license.stateUnconfigured;
     if (licenseStatus.status === 'inactive') return TEXT.license.stateInactive;
@@ -629,8 +637,8 @@ const VIC = (() => {
   }
 
   function getLicenseCardTone() {
-    if (licenseStatus?.status === 'active') return 'active';
-    if (licenseStatus?.status === 'expired') return 'warn';
+    if (licenseStatus?.status === 'active' || licenseStatus?.status === 'trial') return 'active';
+    if (licenseStatus?.status === 'expired' || licenseStatus?.status === 'trial-expired') return 'warn';
     if (licenseStatus?.status === 'inactive') return '';
     return 'invalid';
   }
@@ -668,7 +676,7 @@ const VIC = (() => {
   async function maybePromptActivation() {
     if (isSmokeRenderer) return;
     if (activationPromptShown) return;
-    if (licenseStatus?.status === 'active') return;
+    if (licenseStatus?.valid) return;
 
     activationPromptShown = true;
     openLicenseModal();
