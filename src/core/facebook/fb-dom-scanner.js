@@ -171,19 +171,6 @@ function toAbsoluteFacebookUrl(candidate, baseUrl) {
   }
 }
 
-function toAbsoluteFacebookPaginationUrl(candidate, baseUrl) {
-  const clean = decodeHtmlForMatching(candidate).trim();
-  if (!clean) return '';
-  try {
-    const absolute = new URL(clean, baseUrl || 'https://www.facebook.com');
-    if (!/(^|\.)facebook\.com$/i.test(absolute.hostname)) return '';
-    absolute.hash = '';
-    return absolute.toString();
-  } catch (_) {
-    return '';
-  }
-}
-
 function extractVideoIdFromUrl(url) {
   const value = String(url || '');
   for (const regex of FACEBOOK_VIDEO_URL_REGEXES) {
@@ -406,8 +393,7 @@ function extractSlugHintsFromText(text) {
 async function collectDomSnapshot(webContents, baseUrl) {
   const payload = await webContents.executeJavaScript(
     `(() => {
-      const anchorNodes = Array.from(document.querySelectorAll('a[href]'));
-      const anchors = anchorNodes.map(anchor => anchor.href);
+      const anchors = Array.from(document.querySelectorAll('a[href]')).map(anchor => anchor.href);
       const roleLinks = Array.from(document.querySelectorAll('[role="link"][href]')).map(node => node.href);
       const canonical =
         document.querySelector('link[rel="canonical"]')?.href ||
@@ -417,10 +403,6 @@ async function collectDomSnapshot(webContents, baseUrl) {
       const text = document.body ? document.body.innerText : '';
       return {
         hrefs: anchors.concat(roleLinks),
-        paginationLinks: anchorNodes.map(anchor => ({
-          href: anchor.href,
-          text: String(anchor.textContent || anchor.getAttribute('aria-label') || '').trim()
-        })),
         canonical,
         location: window.location.href,
         html: html.slice(0, 1800000),
@@ -448,23 +430,8 @@ async function collectDomSnapshot(webContents, baseUrl) {
     ids.add(videoId);
   }
 
-  const paginationUrls = [];
-  for (const link of Array.isArray(payload?.paginationLinks) ? payload.paginationLinks : []) {
-    // Giữ nguyên host m.facebook.com/mbasic.facebook.com. Ép sang www ở đây
-    // sẽ làm hỏng link "Xem thêm" và quay lại batch 10 đầu tiên.
-    const absolute = toAbsoluteFacebookPaginationUrl(link?.href, baseUrl);
-    if (!absolute || extractVideoIdFromUrl(absolute)) continue;
-    const text = String(link?.text || '');
-    const hasPaginationParam = /[?&](?:cursor|startindex|sectionLoadingID|bacr|pageno|after)=/i.test(absolute);
-    const hasPaginationLabel = /see more|show more|view more|xem th[eê]m|ti[eế]p|next|older/i.test(text);
-    if ((hasPaginationParam || hasPaginationLabel) && !paginationUrls.includes(absolute)) {
-      paginationUrls.push(absolute);
-    }
-  }
-
   return {
     ids: [...ids],
-    paginationUrls,
     html: payload && payload.html ? payload.html : '',
     location: payload && payload.location ? payload.location : '',
     canonical: payload && payload.canonical ? payload.canonical : ''
@@ -507,8 +474,6 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
   let activeCandidateIndex = 0;
   let activePageUrl = candidateUrls[0] || pageUrl;
   const seenCursors = new Set();
-  const seenPaginationUrls = new Set();
-  const pendingPaginationUrls = [];
 
   function buildStatus(payload = {}) {
     return {
@@ -588,40 +553,6 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
           tryNextRoute('load-error');
         }
       });
-  }
-
-  function enqueuePaginationUrls(urls = []) {
-    for (const url of urls) {
-      if (!url || seenPaginationUrls.has(url) || pendingPaginationUrls.includes(url)) continue;
-      pendingPaginationUrls.push(url);
-    }
-  }
-
-  function loadNextPaginationPage(reason = 'pagination-link') {
-    while (pendingPaginationUrls.length) {
-      const nextUrl = pendingPaginationUrls.shift();
-      if (!nextUrl || seenPaginationUrls.has(nextUrl)) continue;
-      seenPaginationUrls.add(nextUrl);
-      activePageUrl = nextUrl;
-      resetRouteState();
-      resetNoUidTimer();
-      sendScannerStatus({
-        state: 'pagination-page-loading',
-        reason,
-        page: seenPaginationUrls.size,
-        url: nextUrl
-      });
-      webContents.loadURL(nextUrl, {
-        userAgent:
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-          '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-      }).catch(error => {
-        sendScannerStatus({ state: 'pagination-page-error', error: error.message, url: nextUrl });
-        loadNextPaginationPage('pagination-link-error');
-      });
-      return true;
-    }
-    return false;
   }
 
   function tryNextRoute(reason) {
@@ -745,7 +676,6 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
     try {
       domScanCount += 1;
       const snapshot = await collectDomSnapshot(webContents, activePageUrl);
-      enqueuePaginationUrls(snapshot.paginationUrls);
       addCanonicalRoute(snapshot.location);
       addCanonicalRoute(snapshot.canonical);
       for (const slug of extractSlugHintsFromText(snapshot.html)) {
@@ -762,14 +692,6 @@ async function startDomScanner(rawPageUrl, mainWindow, options = {}) {
       }
 
       sendScannerStatus({ state: 'dom-scan', stableRounds });
-
-      if (
-        discoveredInScan.size > 0 &&
-        stableRounds >= 3 &&
-        loadNextPaginationPage('dom-stable')
-      ) {
-        return;
-      }
 
       if (
         isNumericMode &&

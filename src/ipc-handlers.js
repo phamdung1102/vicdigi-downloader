@@ -4,14 +4,14 @@
 // ============================================================
 'use strict';
 
-const { ipcMain, dialog, shell, clipboard, app } = require('electron');
+const { ipcMain, dialog, shell, clipboard, app, BrowserWindow, session } = require('electron');
 const fs = require('fs-extra');
 
 const { isValidYouTubeUrl } = require('./utils');
 const { getVideoInfo, getVideoInfoMulti } = require('./video-info');
 const { downloadVideo, downloadSubtitle, downloadThumbnail } = require('./downloader');
 const { scanChannelVideos } = require('./core/media/scan-service');
-const { startDomScanner } = require('./core/facebook/fb-dom-scanner');
+const { scanFacebookPageReels } = require('./core/platforms/facebook/facebook-page-reels-scanner');
 const {
   deleteCustomProfile,
   getDownloadProfiles,
@@ -31,6 +31,14 @@ let _store        = null;
 let _dlManager    = null;
 let _licenseSvc   = null;
 let _activeFacebookScanCancel = null;
+let _facebookLoginWindow = null;
+const FACEBOOK_PARTITION = 'persist:andrew-facebook-scanner';
+
+async function _getFacebookLoginStatus() {
+  const cookies = await session.fromPartition(FACEBOOK_PARTITION).cookies.get({ name: 'c_user' });
+  const account = cookies.find(cookie => /(^|\.)facebook\.com$/i.test(cookie.domain || ''));
+  return { loggedIn: Boolean(account?.value), userId: account?.value || '' };
+}
 
 /**
  * @param {BrowserWindow}  mainWindow
@@ -352,14 +360,80 @@ function _stopActiveFacebookScan(reason = 'replaced') {
 }
 
 function _registerFacebookScanner() {
+  ipcMain.handle('get-facebook-login-status', _getFacebookLoginStatus);
+  ipcMain.handle('open-facebook-login', async () => {
+    if (_facebookLoginWindow && !_facebookLoginWindow.isDestroyed()) {
+      _facebookLoginWindow.show();
+      _facebookLoginWindow.focus();
+      return { success: true, ...(await _getFacebookLoginStatus()) };
+    }
+
+    _facebookLoginWindow = new BrowserWindow({
+      width: 1100,
+      height: 820,
+      show: true,
+      title: 'Facebook — Andrew Downloader',
+      webPreferences: {
+        partition: FACEBOOK_PARTITION,
+        sandbox: true,
+        backgroundThrottling: false,
+      },
+    });
+    await _facebookLoginWindow.loadURL('https://www.facebook.com/login');
+    return new Promise(resolve => {
+      _facebookLoginWindow.once('closed', async () => {
+        _facebookLoginWindow = null;
+        resolve({ success: true, ...(await _getFacebookLoginStatus()) });
+      });
+    });
+  });
   ipcMain.handle('scan-facebook-page', async (_event, payload = {}) => {
     _requireLicense();
     _stopActiveFacebookScan('replaced');
 
     try {
-      const pageUrl = typeof payload === 'string' ? payload : payload.pageUrl;
-      const maxVideos = typeof payload === 'string' ? 0 : payload.maxVideos;
-      _activeFacebookScanCancel = await startDomScanner(pageUrl, _mainWindow, { maxVideos });
+      const rawUrl = typeof payload === 'string' ? payload : payload.pageUrl;
+      const maxVideos = Number(typeof payload === 'string' ? 20 : payload.maxVideos) || 20;
+      const pageUrl = String(rawUrl || '').trim();
+      const hiddenWindows = new Set();
+      let cancelled = false;
+      _activeFacebookScanCancel = () => {
+        cancelled = true;
+        for (const win of hiddenWindows) if (!win.isDestroyed()) win.destroy();
+      };
+      const startedAt = Date.now();
+      const result = await scanFacebookPageReels({
+        url: pageUrl,
+        maxVideos,
+        timeoutMs: 180000,
+        waitAfterLoadMs: 2200,
+        scrollPauseMs: 1100,
+        onHiddenWindowCreated(win) {
+          hiddenWindows.add(win);
+          win.once('closed', () => hiddenWindows.delete(win));
+        },
+        onProgress(items) {
+          if (cancelled || _event.sender.isDestroyed()) return;
+          _event.sender.send('facebook-uids-discovered', items.filter(item => item.videoId));
+          _event.sender.send('facebook-scan-status', {
+            state: 'scroll',
+            found: items.length,
+            limit: maxVideos,
+            elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+          });
+        },
+      });
+      if (!cancelled && !_event.sender.isDestroyed()) {
+        _event.sender.send('facebook-uids-discovered', result.videos.filter(item => item.videoId));
+        _event.sender.send('facebook-scan-status', {
+          state: 'stopped',
+          reason: result.videos.length >= maxVideos ? 'limit-reached' : 'completed',
+          found: result.videos.length,
+          limit: maxVideos,
+          elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+        });
+      }
+      _activeFacebookScanCancel = null;
       return { success: true };
     } catch (error) {
       _activeFacebookScanCancel = null;

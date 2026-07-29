@@ -135,11 +135,15 @@ const VIC = (() => {
     on('nav-settings', 'click', openSettingsModal);
     on('nav-license', 'click', openLicenseModal);
     on('srcTabChannel', 'click', () => switchBatchSrc('channel'));
-    on('srcTabFacebook', 'click', () => switchBatchSrc('facebook'));
+    on('srcTabFacebook', 'click', () => {
+      switchBatchSrc('facebook');
+      refreshFacebookLoginState().catch(() => {});
+    });
     on('srcTabLinks', 'click', () => switchBatchSrc('links'));
     on('srcTabFile', 'click', () => switchBatchSrc('file'));
     on('loadLinksBtn', 'click', loadLinksFromTextarea);
     on('facebookScanCancelBtn', 'click', cancelFacebookScan);
+    on('facebookLoginBtn', 'click', connectFacebookSession);
     on('batchFilePickerBtn', 'click', () => $('batchFileInput')?.click());
     on('batchSelectAllBtn', 'click', batchSelectAll);
     on('batchDeselectAllBtn', 'click', batchDeselectAll);
@@ -1129,19 +1133,34 @@ const VIC = (() => {
     return `https://www.facebook.com/reel/${uid}`;
   }
 
-  function makeFacebookBatchVideo(uid, index) {
-    const cleanUid = String(uid || '').trim();
+  function makeFacebookBatchVideo(source, index) {
+    const item = source && typeof source === 'object' ? source : { videoId: source };
+    const cleanUid = String(item.videoId || '').trim();
     return {
-      title: cleanUid || `Facebook Reel ${index + 1}`,
-      url: reelUrlFromFacebookUid(cleanUid),
+      title: String(item.title || '').trim() || cleanUid || `Facebook Reel ${index + 1}`,
+      url: item.url || reelUrlFromFacebookUid(cleanUid),
       videoId: cleanUid,
-      author: 'Facebook',
-      duration: 0,
+      author: item.author || 'Facebook',
+      duration: Number(item.duration || 0),
       views: 0,
-      thumbnail: '',
-      maxQuality: 1080,
+      thumbnail: item.thumbnail || '',
+      maxQuality: item.maxQuality || 1080,
       manualUrl: true,
     };
+  }
+
+  async function refreshFacebookLoginState() {
+    const status = await api?.getFacebookLoginStatus?.();
+    if ($('facebookLoginState')) $('facebookLoginState').textContent = status?.loggedIn ? 'Đã đăng nhập' : 'Chưa đăng nhập';
+    if ($('facebookLoginBtn')) $('facebookLoginBtn').textContent = status?.loggedIn ? 'Đổi tài khoản' : 'Đăng nhập Facebook';
+    return status;
+  }
+
+  async function connectFacebookSession() {
+    showStatus('Đăng nhập Facebook trong cửa sổ riêng rồi đóng cửa sổ đó để tiếp tục.', 'info');
+    const status = await api?.openFacebookLogin?.();
+    await refreshFacebookLoginState();
+    showStatus(status?.loggedIn ? 'Đã kết nối Facebook. Có thể quét đầy đủ và lấy tên video.' : 'Chưa phát hiện phiên đăng nhập Facebook.', status?.loggedIn ? 'ok' : 'warn');
   }
 
   function getMaxQualityFromInfo(info, fallback = 1080) {
@@ -1237,6 +1256,7 @@ const VIC = (() => {
     const maxVideos = parseInt($('maxVideos').value, 10) || DEFAULTS.maxVideos;
     await persistUi({ maxVideos, batchSourceMode: 'facebook' });
     facebookScanUids = new Set();
+    resetFacebookMetadataResolver();
     batchVideos = [];
     batchSelected.clear();
     renderBatch();
@@ -1260,23 +1280,34 @@ const VIC = (() => {
     showStatus(`Đã dừng quét Facebook, giữ lại ${facebookScanUids.size} link`, 'warn');
   }
 
-  function handleFacebookUidsDiscovered(uids = []) {
+  function handleFacebookUidsDiscovered(items = []) {
     let changed = false;
-    for (const rawUid of uids) {
-      const uid = String(rawUid || '').trim();
+    const discoveredById = new Map(batchVideos.map(video => [String(video.videoId || ''), video]));
+    for (const rawItem of items) {
+      const item = rawItem && typeof rawItem === 'object' ? rawItem : { videoId: rawItem };
+      const uid = String(item.videoId || '').trim();
       if (!/^\d+$/.test(uid)) continue;
 
       if (!facebookScanUids.has(uid)) {
         facebookScanUids.add(uid);
         changed = true;
       }
+      const current = discoveredById.get(uid);
+      const nextVideo = makeFacebookBatchVideo({ ...current, ...item, videoId: uid }, discoveredById.size);
+      if (!current || nextVideo.title !== current.title || nextVideo.thumbnail !== current.thumbnail) changed = true;
+      discoveredById.set(uid, nextVideo);
     }
 
-    if (!changed) return;
+    if (!changed && discoveredById.size === batchVideos.length) return;
     const ids = [...facebookScanUids];
-    batchVideos = ids.map(makeFacebookBatchVideo);
+    batchVideos = ids.map((uid, index) => discoveredById.get(uid) || makeFacebookBatchVideo(uid, index));
     batchSelected = new Set(batchVideos.map((_, index) => index));
     renderBatch();
+    for (const video of batchVideos) {
+      if (!video.title || video.title === video.videoId || /^Facebook Reel/i.test(video.title)) {
+        enqueueFacebookMetadata(video.videoId, video.url, facebookMetadataScanToken);
+      }
+    }
     $('videoListSection').style.display = 'block';
     updateFacebookScanMetrics({ state: 'Đang quét', found: ids.length });
     showStatus(`Đã phát hiện ${ids.length} link Facebook`, 'ok');
