@@ -85,6 +85,7 @@ const VIC = (() => {
       await loadLicenseStatus();
       await loadAppInfo();
       wireEvents();
+      await batchController?.initializeJobs?.();
       api?.notifyRendererReady?.();
       applyTheme(ui.theme);
       applyUi();
@@ -1615,6 +1616,8 @@ const VIC = (() => {
     getBatchSourceMode: () => ui.batchSourceMode || 'channel',
     showStatus,
     ensureBatchAccess: () => ensureLicenseAccess('tai hang loat'),
+    storeGet,
+    storeSet: (key, value) => api?.storeSet?.(key, value),
   });
 
   updateController = createUpdateController({

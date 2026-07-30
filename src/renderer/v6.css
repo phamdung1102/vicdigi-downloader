@@ -833,6 +833,69 @@ select.field {
   gap: 8px;
   margin-bottom: 10px;
 }
+.batch-job-list {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:12px;
+}
+.batch-job-empty {
+  padding:10px 12px;
+  border:1px dashed var(--border);
+  border-radius:var(--r-sm);
+  color:var(--txt-lo);
+  font-size:11.5px;
+  text-align:center;
+}
+.batch-job-item {
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:var(--r-sm);
+  background:var(--s2);
+}
+.batch-job-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.batch-job-name {
+  min-width:0;
+  overflow:hidden;
+  color:var(--txt-hi);
+  font-size:12px;
+  font-weight:700;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.batch-job-status {
+  flex:0 0 auto;
+  padding:2px 7px;
+  border-radius:99px;
+  background:var(--s4);
+  color:var(--txt-mid);
+  font-size:10.5px;
+  font-weight:700;
+}
+.batch-job-status.running { background:rgba(96,165,250,.12);color:var(--info); }
+.batch-job-status.completed { background:rgba(110,231,183,.10);color:var(--ok); }
+.batch-job-status.failed,.batch-job-status.cancelled { background:rgba(248,113,113,.10);color:var(--danger); }
+.batch-job-meta {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:6px;
+  color:var(--txt-lo);
+  font-size:10.5px;
+}
+.batch-job-track {
+  height:5px;
+  margin-top:7px;
+  overflow:hidden;
+  border-radius:99px;
+  background:var(--s4);
+}
+.batch-job-fill { height:100%;width:0;background:var(--accent);transition:width .2s ease; }
 
 .dc-chip {
   display: inline-flex;

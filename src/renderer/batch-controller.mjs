@@ -17,7 +17,97 @@ export function createBatchController(deps) {
     getBatchSourceMode,
     showStatus,
     ensureBatchAccess,
+    storeGet,
+    storeSet,
   } = deps;
+
+  const BATCH_JOBS_KEY = 'batchDownloadJobs.v1';
+  let batchJobs = [];
+  let processingJobs = false;
+  let currentJobId = '';
+
+  const statusLabels = {
+    queued: 'Đang chờ',
+    running: 'Đang tải',
+    completed: 'Hoàn tất',
+    failed: 'Có lỗi',
+    cancelled: 'Đã dừng',
+  };
+
+  function safeJob(job = {}) {
+    return {
+      id: String(job.id || `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+      name: String(job.name || 'Lô tải hàng loạt'),
+      status: ['queued', 'running', 'completed', 'failed', 'cancelled'].includes(job.status) ? job.status : 'queued',
+      videos: Array.isArray(job.videos) ? job.videos : [],
+      folder: String(job.folder || ''),
+      format: String(job.format || 'mp4'),
+      quality: String(job.quality || '1080p'),
+      sourceMode: String(job.sourceMode || 'channel'),
+      historyTitle: String(job.historyTitle || job.name || ''),
+      nextIndex: Math.max(0, Number(job.nextIndex) || 0),
+      done: Math.max(0, Number(job.done) || 0),
+      failed: Math.max(0, Number(job.failed) || 0),
+      failedVideos: Array.isArray(job.failedVideos) ? job.failedVideos : [],
+      createdAt: job.createdAt || new Date().toISOString(),
+      updatedAt: job.updatedAt || new Date().toISOString(),
+    };
+  }
+
+  async function persistJobs() {
+    await storeSet?.(BATCH_JOBS_KEY, batchJobs.slice(-30));
+  }
+
+  function renderJobs() {
+    const container = $('batchJobList');
+    if (!container) return;
+    if (!batchJobs.length) {
+      container.innerHTML = '<div class="batch-job-empty">Chưa có lô tải hàng loạt.</div>';
+      return;
+    }
+    container.innerHTML = batchJobs.slice().reverse().map(job => {
+      const total = job.videos.length;
+      const processed = Math.min(total, job.done + job.failed);
+      const percent = total ? Math.round((processed / total) * 100) : 0;
+      const status = statusLabels[job.status] || job.status;
+      return `<div class="batch-job-item" data-job-id="${escapeHtml(job.id)}">
+        <div class="batch-job-head">
+          <div class="batch-job-name" title="${escapeHtml(job.name)}">${escapeHtml(job.name)}</div>
+          <span class="batch-job-status ${escapeHtml(job.status)}">${escapeHtml(status)}</span>
+        </div>
+        <div class="batch-job-meta"><span>${processed}/${total} video · ${escapeHtml(job.quality)} ${escapeHtml(job.format.toUpperCase())}</span><span>${percent}%</span></div>
+        <div class="batch-job-track"><div class="batch-job-fill" style="width:${percent}%"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+  }
+
+  function deriveJobName(videos, sourceMode) {
+    const first = videos.find(Boolean) || {};
+    const sourceName = [first.channel, first.channelName, first.uploader, first.author, first.owner, first.pageName]
+      .map(value => String(value || '').trim()).find(Boolean);
+    if (sourceName) return `${sourceName} — ${videos.length} video`;
+    if (sourceMode === 'file') return `Danh sách từ file — ${videos.length} video`;
+    if (sourceMode === 'links') return `Danh sách liên kết — ${videos.length} video`;
+    try {
+      const host = new URL(first.url || $('urlInput')?.value || '').hostname.replace(/^www\./, '');
+      if (host) return `${host} — ${videos.length} video`;
+    } catch (_) {}
+    return `Lô tải — ${videos.length} video`;
+  }
+
+  async function initializeJobs() {
+    const stored = await storeGet?.(BATCH_JOBS_KEY);
+    batchJobs = (Array.isArray(stored) ? stored : []).map(safeJob).map(job => (
+      job.status === 'running' ? { ...job, status: 'queued' } : job
+    ));
+    renderJobs();
+    await persistJobs();
+    processJobQueue().catch(error => console.warn('Resume batch jobs failed:', error));
+  }
 
   function getFilterValue(id) {
     return String($(id)?.value || '').trim();
@@ -171,7 +261,7 @@ export function createBatchController(deps) {
     await persistUi({ batchFormat: format, batchQuality: quality, batchSubs: $('batchSubs').value });
     if (!selectedVideos.length) return showStatus(TEXT.batch.selectVideo, 'warn');
 
-    return executeBatchDownload(selectedVideos, {
+    return enqueueBatchJob(selectedVideos, {
       folder,
       format,
       quality,
@@ -180,12 +270,62 @@ export function createBatchController(deps) {
     });
   }
 
+  async function enqueueBatchJob(selectedVideos, options = {}) {
+    const job = safeJob({
+      name: options.name || deriveJobName(selectedVideos, options.sourceMode),
+      status: 'queued',
+      videos: selectedVideos.map(video => ({ ...video })),
+      folder: options.folder,
+      format: options.format,
+      quality: options.quality,
+      sourceMode: options.sourceMode,
+      historyTitle: options.historyTitle,
+    });
+    batchJobs.push(job);
+    await persistJobs();
+    renderJobs();
+    showStatus(`Đã thêm lô "${job.name}" vào hàng chờ`, 'ok');
+    processJobQueue().catch(error => console.warn('Batch queue failed:', error));
+    return job;
+  }
+
+  async function processJobQueue() {
+    if (processingJobs) return;
+    if (typeof ensureBatchAccess === 'function' && !ensureBatchAccess()) return;
+    processingJobs = true;
+    try {
+      while (true) {
+        const job = batchJobs.find(item => item.status === 'queued');
+        if (!job) break;
+        currentJobId = job.id;
+        job.status = 'running';
+        job.updatedAt = new Date().toISOString();
+        await persistJobs();
+        renderJobs();
+        await executeBatchDownload(job.videos, {
+          folder: job.folder,
+          format: job.format,
+          quality: job.quality,
+          sourceMode: job.sourceMode,
+          historyTitle: job.historyTitle || job.name,
+          job,
+        });
+        currentJobId = '';
+      }
+    } finally {
+      processingJobs = false;
+      currentJobId = '';
+      renderJobs();
+    }
+  }
+
   async function executeBatchDownload(selectedVideos, options = {}) {
     const {
       folder,
       format,
       quality,
       sourceMode = 'channel',
+      job = null,
       historyTitle = `${selectedVideos.length} video (hàng loạt)`,
     } = options;
 
@@ -199,14 +339,14 @@ export function createBatchController(deps) {
       mode: 'running',
     });
 
-    $('downloadBatchBtn').style.display = 'none';
     $('cancelBatchBtn').style.display = 'inline-flex';
     $('batchProgress').classList.add('show');
 
-    let done = 0;
-    let failed = 0;
+    let done = job?.done || 0;
+    let failed = job?.failed || 0;
+    const startIndex = Math.min(job?.nextIndex || 0, selectedVideos.length);
 
-    for (let index = 0; index < selectedVideos.length; index++) {
+    for (let index = startIndex; index < selectedVideos.length; index++) {
       if (getState().batchCancelled) break;
 
       const video = selectedVideos[index];
@@ -227,6 +367,10 @@ export function createBatchController(deps) {
       const removeProgress = api?.onDownloadProgress?.(data => {
         const overall = (index / selectedVideos.length + (data.percent / 100) / selectedVideos.length) * 100;
         $('batchProgressFill').style.width = `${Math.round(overall)}%`;
+        if (job) {
+          const fill = $('batchJobList')?.querySelector?.(`[data-job-id="${job.id}"] .batch-job-fill`);
+          if (fill) fill.style.width = `${Math.round(overall)}%`;
+        }
       });
 
       try {
@@ -235,9 +379,19 @@ export function createBatchController(deps) {
       } catch (error) {
         failed++;
         getState().lastBatchFailedVideos.push(video);
+        if (job) job.failedVideos.push(video);
         console.warn(`Batch failed [${video.title}]:`, error.message);
       } finally {
         removeProgress?.();
+      }
+
+      if (job) {
+        job.done = done;
+        job.failed = failed;
+        job.nextIndex = index + 1;
+        job.updatedAt = new Date().toISOString();
+        await persistJobs();
+        renderJobs();
       }
 
       updateBatchRunSummary({
@@ -260,7 +414,6 @@ export function createBatchController(deps) {
     $('batchProgressFill').style.width = '100%';
     $('batchProgressText').textContent = `${done}/${selectedVideos.length}`;
     $('batchProgressLabel').textContent = getState().batchCancelled ? TEXT.batch.stoppedLabel : TEXT.batch.doneLabel;
-    $('downloadBatchBtn').style.display = 'inline-flex';
     $('cancelBatchBtn').style.display = 'none';
     $('batchProgress').classList.remove('show');
 
@@ -278,6 +431,14 @@ export function createBatchController(deps) {
     else showStatus(TEXT.batch.finished(done, folder), 'ok');
 
     if (!getState().batchCancelled) showResultModal(selectedVideos.length, done, failed, folder, getState().lastBatchFailedVideos);
+    if (job) {
+      job.status = getState().batchCancelled ? 'cancelled' : (failed > 0 ? 'failed' : 'completed');
+      job.done = done;
+      job.failed = failed;
+      job.updatedAt = new Date().toISOString();
+      await persistJobs();
+      renderJobs();
+    }
     addHistory({
       type: 'batch',
       title: historyTitle,
@@ -303,12 +464,13 @@ export function createBatchController(deps) {
     if (!folder) return showStatus(TEXT.batch.selectFolder, 'warn');
 
     closeResultModal();
-    return executeBatchDownload(lastBatchFailedVideos, {
+    return enqueueBatchJob(lastBatchFailedVideos, {
       folder,
       format: $('batchFormat').value,
       quality: $('batchQuality').value,
       sourceMode: 'links',
       historyTitle: `${lastBatchFailedVideos.length} video (retry failed)`,
+      name: `Tải lại video lỗi — ${lastBatchFailedVideos.length} video`,
     });
   }
 
@@ -479,5 +641,7 @@ export function createBatchController(deps) {
     openResultFolder,
     applyFilters,
     resetFilters,
+    initializeJobs,
+    renderJobs,
   };
 }
