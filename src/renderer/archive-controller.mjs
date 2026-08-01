@@ -85,8 +85,8 @@ export function createArchiveController(deps) {
     if (sources.some(source => source.url.replace(/\/$/, '') === url.replace(/\/$/, ''))) {
       return showStatus('Nguồn này đã có trong Watch List.', 'warn');
     }
-    let folder = $('batchFolderInput')?.value.trim() || '';
-    if (!folder) folder = await api?.getDefaultDownloadFolder?.();
+    const folder = $('archiveSourceFolder')?.value.trim() || '';
+    if (!folder) return showStatus('Hãy chọn thư mục thư viện của nguồn để đối chiếu file.', 'warn');
     const source = normalizeSource({
       name: $('archiveSourceName')?.value.trim() || detectPlatform(url),
       url,
@@ -100,12 +100,39 @@ export function createArchiveController(deps) {
     render();
     if ($('archiveSourceUrl')) $('archiveSourceUrl').value = '';
     if ($('archiveSourceName')) $('archiveSourceName').value = '';
+    if ($('archiveSourceFolder')) $('archiveSourceFolder').value = '';
+    await syncSource(source.id, { manual: true });
+  }
+
+  async function chooseAddFolder() {
+    const folder = await api?.selectDownloadFolder?.();
+    if (folder && $('archiveSourceFolder')) $('archiveSourceFolder').value = folder;
+  }
+
+  async function changeSourceFolder(sourceId) {
+    const source = sources.find(item => item.id === sourceId);
+    if (!source) return;
+    const folder = await api?.selectDownloadFolder?.();
+    if (!folder) return;
+    source.folder = folder;
+    source.status = 'idle';
+    source.message = 'Đã đổi thư mục, cần đồng bộ lại';
+    await persist();
+    render();
     await syncSource(source.id, { manual: true });
   }
 
   async function syncSource(sourceId, { manual = false } = {}) {
     const source = sources.find(item => item.id === sourceId);
     if (!source || source.status === 'syncing') return;
+    if (!source.folder) {
+      source.status = 'error';
+      source.message = 'Chưa chọn thư mục thư viện';
+      await persist();
+      render();
+      if (manual) showStatus(`${source.name}: hãy chọn thư mục thư viện trước.`, 'warn');
+      return;
+    }
     source.status = 'syncing';
     source.message = 'Đang quét nguồn…';
     render();
@@ -245,8 +272,8 @@ export function createArchiveController(deps) {
       const mode = source.mode === 'auto' ? 'Tự động tải' : source.mode === 'notify' ? 'Chỉ thông báo' : 'Chờ xác nhận';
       const checked = source.lastCheckedAt ? new Date(source.lastCheckedAt).toLocaleString('vi-VN') : 'Chưa quét';
       return `<div class="archive-source-card" data-source-id="${escapeHtml(source.id)}">
-        <div class="archive-source-head"><div><div class="archive-source-name">${escapeHtml(source.name)}</div><div class="archive-source-url">${escapeHtml(source.platform)} · ${escapeHtml(source.url)}</div></div>
-        <div class="archive-source-actions"><button class="btn btn-ghost btn-xs" data-action="sync">Đồng bộ</button>${source.pendingIds.length ? `<button class="btn btn-primary btn-xs" data-action="download">Tải ${source.pendingIds.length} mới</button>` : ''}<button class="btn btn-danger btn-xs" data-action="remove">Xóa nguồn</button></div></div>
+        <div class="archive-source-head"><div><div class="archive-source-name">${escapeHtml(source.name)}</div><div class="archive-source-url">${escapeHtml(source.platform)} · ${escapeHtml(source.url)}</div><div class="archive-source-folder">Thư viện: ${escapeHtml(source.folder || 'Chưa chọn')}</div></div>
+        <div class="archive-source-actions"><button class="btn btn-ghost btn-xs" data-action="folder">Đổi thư mục</button><button class="btn btn-ghost btn-xs" data-action="sync">Đồng bộ</button>${source.pendingIds.length ? `<button class="btn btn-primary btn-xs" data-action="download">Tải ${source.pendingIds.length} mới</button>` : ''}<button class="btn btn-danger btn-xs" data-action="remove">Xóa nguồn</button></div></div>
         <div class="archive-source-stats"><div class="archive-stat"><span>Đã phát hiện</span><b>${source.items.length}</b></div><div class="archive-stat"><span>Đã lưu</span><b>${archived}</b></div><div class="archive-stat"><span>Mới/chờ</span><b>${source.pendingIds.length}</b></div><div class="archive-stat"><span>Thiếu/lỗi</span><b>${missing}</b></div><div class="archive-stat"><span>Không còn thấy</span><b>${source.removedIds.length}</b></div></div>
         <div class="archive-source-foot"><span class="archive-status-${escapeHtml(source.status)}">${escapeHtml(source.message || 'Sẵn sàng')}</span><span>${escapeHtml(mode)} · ${escapeHtml(checked)}</span></div>
       </div>`;
@@ -258,10 +285,11 @@ export function createArchiveController(deps) {
     const card = button?.closest('[data-source-id]');
     if (!button || !card) return;
     const sourceId = card.dataset.sourceId;
+    if (button.dataset.action === 'folder') changeSourceFolder(sourceId);
     if (button.dataset.action === 'sync') syncSource(sourceId, { manual: true });
     if (button.dataset.action === 'download') downloadPending(sourceId);
     if (button.dataset.action === 'remove') removeSource(sourceId);
   }
 
-  return { initialize, addSource, syncAll, syncSource, downloadPending, recordDownload, handleClick, render };
+  return { initialize, addSource, chooseAddFolder, syncAll, syncSource, downloadPending, recordDownload, handleClick, render };
 }

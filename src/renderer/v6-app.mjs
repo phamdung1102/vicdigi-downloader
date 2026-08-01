@@ -149,6 +149,7 @@ const VIC = (() => {
     on('nav-settings', 'click', openSettingsModal);
     on('nav-license', 'click', openLicenseModal);
     on('archiveAddSourceBtn', 'click', () => archiveController?.addSource?.());
+    on('archiveChooseFolderBtn', 'click', () => archiveController?.chooseAddFolder?.());
     on('archiveSyncAllBtn', 'click', () => archiveController?.syncAll?.());
     $('archiveSourceList')?.addEventListener('click', event => archiveController?.handleClick?.(event));
     on('srcTabChannel', 'click', () => switchBatchSrc('channel'));

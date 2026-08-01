@@ -942,6 +942,8 @@ select.field {
   text-overflow:ellipsis;
   white-space:nowrap;
 }
+.archive-source-folder { margin-top:5px; color:var(--text-muted); font-size:12px; overflow-wrap:anywhere; }
+.archive-folder-field { grid-column:span 2; }
 .archive-source-actions { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px; }
 .archive-source-stats {
   display:grid;

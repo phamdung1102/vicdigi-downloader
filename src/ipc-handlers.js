@@ -418,11 +418,23 @@ function _registerBatch() {
     const folder = String(payload.folder || '').trim();
     const videoIds = [...new Set((Array.isArray(payload.videoIds) ? payload.videoIds : []).map(value => String(value || '').trim()).filter(Boolean))].slice(0, 2000);
     if (!folder || !(await fs.pathExists(folder))) return {};
-    const names = (await fs.readdir(folder)).slice(0, 10000);
+    const files = [];
+    const pending = [folder];
+    while (pending.length && files.length < 20000) {
+      const current = pending.shift();
+      let entries = [];
+      try { entries = await fs.readdir(current, { withFileTypes: true }); } catch (_) { continue; }
+      for (const entry of entries) {
+        const fullPath = path.join(current, entry.name);
+        if (entry.isDirectory()) pending.push(fullPath);
+        else if (entry.isFile()) files.push({ name: entry.name, path: fullPath });
+        if (files.length >= 20000) break;
+      }
+    }
     const result = {};
     for (const videoId of videoIds) {
-      const matched = names.find(name => name.includes(`[${videoId}]`) || name.includes(videoId));
-      if (matched) result[videoId] = path.join(folder, matched);
+      const matched = files.find(file => file.name.includes(`[${videoId}]`) || file.name.includes(videoId));
+      if (matched) result[videoId] = matched.path;
     }
     return result;
   });
