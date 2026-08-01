@@ -942,15 +942,35 @@ select.field {
   text-overflow:ellipsis;
   white-space:nowrap;
 }
-.archive-source-folder { margin-top:5px; color:var(--text-muted); font-size:12px; overflow-wrap:anywhere; }
+.archive-source-folder { margin-top:5px; color:var(--txt-mid); font-size:12px; overflow-wrap:anywhere; }
 .archive-folder-field { grid-column:span 2; }
 .archive-source-actions .active { color:var(--accent); border-color:color-mix(in srgb,var(--accent) 55%,var(--border)); background:color-mix(in srgb,var(--accent) 12%,transparent); }
-.archive-download { margin-top:12px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); }
-.archive-download-meta { display:flex; justify-content:space-between; gap:12px; margin-bottom:7px; font-size:12px; color:var(--text-muted); }
+.archive-download { margin-top:12px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--s2); }
+.archive-download-meta { display:flex; justify-content:space-between; gap:12px; margin-bottom:7px; font-size:12px; color:var(--txt-mid); }
 .archive-download-meta span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.archive-download-meta b { color:var(--text); white-space:nowrap; }
+.archive-download-meta b { color:var(--txt-hi); white-space:nowrap; }
 .archive-download-track { height:6px; overflow:hidden; border-radius:999px; background:var(--border); }
 .archive-download-fill { height:100%; border-radius:inherit; background:var(--accent); transition:width .2s ease; }
+.archive-activity { display:grid; grid-template-columns:minmax(230px,1fr) auto auto; align-items:center; gap:12px; margin:12px 0; padding:11px 12px; border:1px solid var(--border); border-radius:11px; background:var(--s2); }
+.archive-activity.auto,.archive-activity.running { border-color:color-mix(in srgb,var(--accent) 48%,var(--border)); background:color-mix(in srgb,var(--accent) 8%,var(--s2)); }
+.archive-activity-state { display:flex; align-items:center; gap:10px; min-width:0; }
+.archive-activity-state div { display:flex; flex-direction:column; min-width:0; }
+.archive-activity-state b { font-size:12px; letter-spacing:.04em; color:var(--txt-hi); }
+.archive-activity-state span:not(.archive-activity-dot) { margin-top:2px; font-size:12px; color:var(--txt-mid); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.archive-activity-dot { width:10px; height:10px; flex:0 0 auto; border-radius:50%; background:var(--txt-mid); box-shadow:0 0 0 4px color-mix(in srgb,var(--txt-mid) 14%,transparent); }
+.archive-activity.auto .archive-activity-dot,.archive-activity.running .archive-activity-dot { background:var(--accent); box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 18%,transparent); }
+.archive-activity.running .archive-activity-dot { animation:archivePulse 1.2s ease-in-out infinite; }
+.archive-mode-switch { display:flex; padding:3px; border:1px solid var(--border); border-radius:9px; background:var(--s1); }
+.archive-mode-switch button { border:0; border-radius:6px; padding:6px 9px; color:var(--txt-mid); background:transparent; cursor:pointer; font:inherit; font-size:12px; }
+.archive-mode-switch button.active { color:#fff; background:var(--accent); }
+.archive-restore-switch { display:flex; align-items:center; gap:7px; border:0; color:var(--txt-mid); background:transparent; cursor:pointer; font:inherit; font-size:12px; white-space:nowrap; }
+.archive-restore-switch span { width:30px; height:17px; padding:2px; border-radius:999px; background:var(--border); transition:.2s; }
+.archive-restore-switch span::after { content:""; display:block; width:13px; height:13px; border-radius:50%; background:#fff; transition:.2s; }
+.archive-restore-switch.active { color:var(--txt-hi); }
+.archive-restore-switch.active span { background:var(--accent); }
+.archive-restore-switch.active span::after { transform:translateX(13px); }
+@keyframes archivePulse { 50% { opacity:.45; transform:scale(.8); } }
+@media (max-width:1200px) { .archive-activity { grid-template-columns:1fr; align-items:start; } .archive-mode-switch { width:max-content; } }
 .archive-source-actions { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px; }
 .archive-source-stats {
   display:grid;

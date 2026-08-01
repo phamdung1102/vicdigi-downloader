@@ -1,6 +1,6 @@
 {
   "name": "vicdigi-downloader",
-  "version": "8.9.0",
+  "version": "8.9.1",
   "description": "Andrew Downloader - YouTube, Instagram, TikTok, Facebook, Twitter/X, Vimeo",
   "main": "main.js",
   "scripts": {

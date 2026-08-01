@@ -313,10 +313,10 @@ export function createArchiveController(deps) {
     render();
   }
 
-  async function toggleAuto(sourceId) {
+  async function setSourceMode(sourceId, mode) {
     const source = sources.find(item => item.id === sourceId);
-    if (!source) return;
-    source.mode = source.mode === 'auto' ? 'queue' : 'auto';
+    if (!source || !['auto', 'queue', 'notify'].includes(mode)) return;
+    source.mode = mode;
     await persist();
     render();
   }
@@ -392,9 +392,22 @@ export function createArchiveController(deps) {
       const processed = Math.min(download.ids.length, download.done + download.failed);
       const overall = download.ids.length ? Math.round(((processed + (download.status === 'running' ? download.progress / 100 : 0)) / download.ids.length) * 100) : 0;
       const isDownloading = ['queued', 'running'].includes(download.status);
+      const modeTitle = isDownloading
+        ? (source.mode === 'auto' ? 'ĐANG TỰ ĐỘNG TẢI' : 'ĐANG TẢI THEO YÊU CẦU')
+        : source.mode === 'auto' ? 'TỰ ĐỘNG TẢI' : source.mode === 'notify' ? 'CHỈ THÔNG BÁO' : 'CHỜ XÁC NHẬN';
+      const modeDescription = isDownloading
+        ? `${processed}/${download.ids.length} video · ${overall}%`
+        : source.mode === 'auto' ? 'Video mới sẽ tự tải về thư mục của kênh.'
+          : source.mode === 'notify' ? 'Chỉ báo khi có video mới, không tự tạo lượt tải.'
+            : 'Video mới sẽ chờ bạn bấm nút Tải.';
       return `<div class="archive-source-card" data-source-id="${escapeHtml(source.id)}">
         <div class="archive-source-head"><div><div class="archive-source-name">${escapeHtml(source.name)}</div><div class="archive-source-url">${escapeHtml(source.platform)} · ${escapeHtml(source.url)}</div><div class="archive-source-folder">Thư viện: ${escapeHtml(source.folder || 'Chưa chọn')}</div></div>
-        <div class="archive-source-actions"><button class="btn btn-ghost btn-xs ${source.mode === 'auto' ? 'active' : ''}" data-action="auto">Tự tải: ${source.mode === 'auto' ? 'Bật' : 'Tắt'}</button><button class="btn btn-ghost btn-xs ${source.autoRestore ? 'active' : ''}" data-action="restore">Khôi phục: ${source.autoRestore ? 'Bật' : 'Tắt'}</button><button class="btn btn-ghost btn-xs" data-action="folder">Đổi thư mục</button><button class="btn btn-ghost btn-xs" data-action="sync">Đồng bộ</button>${source.pendingIds.length && !isDownloading ? `<button class="btn btn-primary btn-xs" data-action="download">Tải ${source.pendingIds.length}</button>` : ''}${isDownloading ? '<button class="btn btn-danger btn-xs" data-action="stop">Dừng tải</button>' : ''}<button class="btn btn-danger btn-xs" data-action="remove">Xóa nguồn</button></div></div>
+        <div class="archive-source-actions"><button class="btn btn-ghost btn-xs" data-action="folder">Đổi thư mục</button><button class="btn btn-ghost btn-xs" data-action="sync">Đồng bộ</button>${source.pendingIds.length && !isDownloading ? `<button class="btn btn-primary btn-xs" data-action="download">Tải ${source.pendingIds.length}</button>` : ''}${isDownloading ? '<button class="btn btn-danger btn-xs" data-action="stop">Dừng tải</button>' : ''}<button class="btn btn-danger btn-xs" data-action="remove">Xóa nguồn</button></div></div>
+        <div class="archive-activity ${escapeHtml(isDownloading ? 'running' : source.mode)}">
+          <div class="archive-activity-state"><span class="archive-activity-dot"></span><div><b>${escapeHtml(modeTitle)}</b><span>${escapeHtml(modeDescription)}</span></div></div>
+          <div class="archive-mode-switch" role="group" aria-label="Chế độ theo dõi"><button class="${source.mode === 'auto' ? 'active' : ''}" data-action="mode-auto">Tự động</button><button class="${source.mode === 'queue' ? 'active' : ''}" data-action="mode-queue">Chờ duyệt</button><button class="${source.mode === 'notify' ? 'active' : ''}" data-action="mode-notify">Chỉ báo</button></div>
+          <button class="archive-restore-switch ${source.autoRestore ? 'active' : ''}" data-action="restore" role="switch" aria-checked="${source.autoRestore}"><span></span> Tự khôi phục file thiếu</button>
+        </div>
         <div class="archive-source-stats"><div class="archive-stat"><span>Đã phát hiện</span><b>${source.items.length}</b></div><div class="archive-stat"><span>Đã lưu</span><b>${archived}</b></div><div class="archive-stat"><span>Mới/chờ</span><b>${source.pendingIds.length}</b></div><div class="archive-stat"><span>Thiếu/lỗi</span><b>${missing}</b></div><div class="archive-stat"><span>Không còn thấy</span><b>${source.removedIds.length}</b></div></div>
         ${download.ids.length ? `<div class="archive-download"><div class="archive-download-meta"><span>${isDownloading ? escapeHtml(download.currentTitle || 'Đang chuẩn bị…') : escapeHtml(source.message)}</span><b>${processed}/${download.ids.length} · ${overall}%</b></div><div class="archive-download-track"><div class="archive-download-fill" style="width:${overall}%"></div></div></div>` : ''}
         <div class="archive-source-foot"><span class="archive-status-${escapeHtml(source.status)}">${escapeHtml(source.message || 'Sẵn sàng')}</span><span>${escapeHtml(mode)} · ${escapeHtml(checked)}</span></div>
@@ -407,7 +420,7 @@ export function createArchiveController(deps) {
     const card = button?.closest('[data-source-id]');
     if (!button || !card) return;
     const sourceId = card.dataset.sourceId;
-    if (button.dataset.action === 'auto') toggleAuto(sourceId);
+    if (button.dataset.action.startsWith('mode-')) setSourceMode(sourceId, button.dataset.action.slice(5));
     if (button.dataset.action === 'restore') toggleRestore(sourceId);
     if (button.dataset.action === 'stop') stopSourceDownload(sourceId);
     if (button.dataset.action === 'folder') changeSourceFolder(sourceId);
