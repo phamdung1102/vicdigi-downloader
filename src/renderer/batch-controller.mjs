@@ -20,6 +20,7 @@ export function createBatchController(deps) {
     storeGet,
     storeSet,
     onArchiveVideoResult,
+    onVideoDownloaded,
   } = deps;
 
   const BATCH_JOBS_KEY = 'batchDownloadJobs.v1';
@@ -378,6 +379,7 @@ export function createBatchController(deps) {
         const result = await api.downloadVideo({ url: video.url, outputPath: folder, format, quality, title: video.title || '' });
         done++;
         await onArchiveVideoResult?.(video, result, null);
+        await onVideoDownloaded?.(video, result, { folder, format, quality });
       } catch (error) {
         failed++;
         getState().lastBatchFailedVideos.push(video);

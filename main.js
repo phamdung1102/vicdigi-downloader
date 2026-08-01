@@ -359,11 +359,12 @@ async function _runRendererSmoke(window) {
         error: window.__VIC_BOOT_ERROR || null,
         hasShell: !!document.querySelector('.shell'),
         hasUrlInput: !!document.getElementById('urlInput'),
-        hasApi: !!window.electronAPI
+        hasApi: !!window.electronAPI,
+        hasAiAudio: !!document.getElementById('tab-ai-audio') && !!document.getElementById('aiStartBtn')
       })
     `, true);
 
-    if (probe.booted) return probe;
+    if (probe.booted && probe.hasAiAudio) return probe;
     if (probe.error) throw new Error(probe.error);
     await new Promise(resolve => setTimeout(resolve, 250));
   }

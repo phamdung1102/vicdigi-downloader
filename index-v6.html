@@ -58,6 +58,13 @@
     </div>
 
     <div class="sidebar-divider"></div>
+    <div class="nav-section">Công cụ</div>
+    <div class="nav-item" id="nav-ai-audio">
+      <span>Tách nhạc AI</span>
+      <span class="nav-badge">AI</span>
+    </div>
+
+    <div class="sidebar-divider"></div>
     <div class="nav-section">Hệ thống</div>
 
     <div class="nav-item" id="nav-settings">
@@ -195,6 +202,7 @@
           <div class="option-checks">
             <label><input type="checkbox" id="embedMetadata" checked /> Nhúng metadata</label>
             <label><input type="checkbox" id="embedThumbnail" /> Nhúng ảnh bìa</label>
+            <label class="ai-auto-option"><input type="checkbox" id="autoSeparateAudio" /> Tự tách nhạc AI sau khi tải</label>
           </div>
           <div class="clip-options">
             <label class="clip-enable">
@@ -406,6 +414,7 @@
             </select>
           </div>
         </div>
+        <label class="ai-batch-auto"><input type="checkbox" id="autoSeparateBatch" /> Tự đưa mỗi video tải xong sang hàng đợi Tách nhạc AI</label>
       </div>
 
       <div class="card">
@@ -523,6 +532,32 @@
       </div>
 
     </div><!-- /tab-batch -->
+
+    <div class="tab-panel" id="tab-ai-audio">
+      <div class="ai-page-header"><div><h2>AI Music Separation</h2><p>Tách giọng nói, nhạc nền và các stem từ video ngay trên máy.</p></div><span class="ai-engine-badge missing" id="aiEngineBadge">Đang kiểm tra…</span></div>
+      <div class="ai-workspace">
+        <section class="card ai-main-card">
+          <div class="card-title">Nguồn xử lý</div>
+          <div class="field-wrap"><label class="field-label">Video hoặc audio</label><div class="folder-row"><input class="field" id="aiInputFile" readonly placeholder="Chọn video đã tải hoặc file trên máy…"><button class="btn btn-primary btn-sm" id="aiChooseInputBtn">Chọn file</button></div></div>
+          <div class="ai-option-grid">
+            <div class="field-wrap"><label class="field-label">Chế độ tách</label><select class="field" id="aiMode"><option value="background">Chỉ lấy nhạc nền</option><option value="voice">Chỉ lấy giọng nói</option><option value="two">Vocal + Instrumental</option><option value="stems4">4 stems: Vocal, Drums, Bass, Other</option></select></div>
+            <div class="field-wrap"><label class="field-label">Chất lượng</label><select class="field" id="aiQuality"><option value="fast">Nhanh</option><option value="balanced" selected>Cân bằng</option><option value="high">Chất lượng cao</option></select></div>
+            <div class="field-wrap"><label class="field-label">Định dạng xuất</label><select class="field" id="aiFormat"><option value="wav">WAV</option><option value="flac">FLAC</option><option value="mp3">MP3</option></select></div>
+            <div class="field-wrap"><label class="field-label">Model</label><select class="field" id="aiModel"><option value="">Tự chọn model phù hợp</option></select></div>
+          </div>
+          <div class="field-wrap"><label class="field-label">Thư mục xuất</label><div class="folder-row"><input class="field" id="aiOutputFolder" readonly placeholder="Chọn nơi lưu các track…"><button class="btn btn-ghost btn-sm" id="aiChooseOutputBtn">Chọn</button></div></div>
+          <div class="ai-progress" id="aiProgress"><div class="ai-progress-orbit"><span></span></div><div><b>Trạng thái xử lý</b><span id="aiProgressText">Sẵn sàng nhận video.</span></div></div>
+          <div class="ai-run-actions"><button class="btn btn-primary" id="aiStartBtn">Bắt đầu tách nhạc</button><button class="btn btn-danger" id="aiCancelBtn" style="display:none">Dừng</button></div>
+        </section>
+        <aside class="card ai-model-card">
+          <div class="ai-model-head"><div><div class="card-title">Engine và model</div><span id="aiModelCount">0 model nhận diện</span></div><button class="btn btn-primary btn-sm" id="aiSetupBtn">Tự động cài engine</button></div>
+          <p class="ai-note">Model không nằm trong bộ cài. App có thể tự tải khi dùng lần đầu hoặc nhận model bạn tự thêm.</p>
+          <div class="field-wrap"><label class="field-label">Thư mục model</label><div class="folder-row"><input class="field" id="aiModelFolder" readonly><button class="btn btn-ghost btn-sm" id="aiChooseModelFolderBtn">Đổi</button></div></div>
+          <button class="btn btn-ghost btn-sm ai-scan-btn" id="aiScanModelsBtn">Quét lại thư mục model</button>
+          <div class="ai-model-list" id="aiModelList"></div>
+        </aside>
+      </div>
+    </div>
 
     <div class="tab-panel" id="tab-archive">
       <div class="archive-header">

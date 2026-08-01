@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDownloadFolder: () => invoke('select-download-folder'),
   getDefaultDownloadFolder: () => invoke('get-default-download-folder'),
   selectCookieFile: () => invoke('select-cookie-file'),
+  selectMediaFile: () => invoke('select-media-file'),
   downloadVideo: (options) => invoke('download-video', options),
   downloadSubtitle: (options) => invoke('download-subtitle', options),
   downloadThumbnail: (options) => invoke('download-thumbnail', options),
@@ -42,6 +43,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openBrowserExtensionFolder: () => invoke('open-browser-extension-folder'),
   clearPrivateData: () => invoke('clear-private-data'),
   showSystemNotification: (payload) => invoke('show-system-notification', payload),
+  getAiSeparationStatus: (modelFolder) => invoke('ai-separation-status', modelFolder),
+  scanAiModels: (modelFolder) => invoke('ai-scan-models', modelFolder),
+  installAiSeparationEngine: () => invoke('ai-install-engine'),
+  separateAudio: (options) => invoke('ai-separate', options),
+  cancelAudioSeparation: () => invoke('ai-separation-cancel'),
+  onAiSeparationProgress: (callback) => {
+    const wrapped = (_event, data) => callback(data);
+    ipcRenderer.on('ai-separation-progress', wrapped);
+    return () => ipcRenderer.removeListener('ai-separation-progress', wrapped);
+  },
   checkAppUpdate: () => invoke('check-app-update'),
 
   // ── System ────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import { createBatchController } from './batch-controller.mjs';
 import { createHistoryController } from './history-controller.mjs';
 import { createUpdateController } from './update-controller.mjs';
 import { createArchiveController } from './archive-controller.mjs';
+import { createAudioSeparationController } from './audio-separation-controller.mjs';
 import { DEFAULTS, MAX_BATCH_VIDEOS, MAX_YOUTUBE_BATCH_DELAY_MS, MIN_YOUTUBE_BATCH_DELAY_MS, TEXT } from './messages.mjs';
 
 const api = typeof window !== 'undefined' ? window.electronAPI : null;
@@ -37,6 +38,7 @@ const VIC = (() => {
   let historyController;
   let updateController;
   let archiveController;
+  let audioSeparationController;
 
   const $ = id => document.getElementById(id);
   const on = (id, eventName, handler) => $(id)?.addEventListener(eventName, handler);
@@ -87,6 +89,8 @@ const VIC = (() => {
       await loadLicenseStatus();
       await loadAppInfo();
       wireEvents();
+      audioSeparationController?.wire?.();
+      await audioSeparationController?.initialize?.();
       await archiveController?.initialize?.();
       await batchController?.initializeJobs?.();
       api?.notifyRendererReady?.();
@@ -145,6 +149,7 @@ const VIC = (() => {
     on('nav-single', 'click', () => switchTab('single'));
     on('nav-batch', 'click', () => switchTab('batch'));
     on('nav-archive', 'click', () => switchTab('archive'));
+    on('nav-ai-audio', 'click', () => switchTab('ai-audio'));
     on('nav-history', 'click', () => switchTab('history'));
     on('nav-settings', 'click', openSettingsModal);
     on('nav-license', 'click', openLicenseModal);
@@ -1207,6 +1212,9 @@ const VIC = (() => {
       });
       hideProgress();
       showStatus(`T\u1ea3i xong! File: ${result.filePath || folder}`, 'ok');
+      if ($('autoSeparateAudio')?.checked && format !== 'mp3') {
+        await audioSeparationController?.enqueueDownloadedFile?.(result.filePath, folder);
+      }
       quickStatusReporter?.('completed', 100, 'Tải xong');
       addHistory({ type: 'video', title: videoInfo?.title || url, url, format, quality, folder });
     } catch (error) {
@@ -1630,6 +1638,12 @@ const VIC = (() => {
     storeGet,
     storeSet: (key, value) => api?.storeSet?.(key, value),
     onArchiveVideoResult: (video, result, error) => archiveController?.recordDownload?.(video, result, error),
+    onVideoDownloaded: (_video, result, options) => {
+      if ($('autoSeparateBatch')?.checked && options?.format !== 'mp3') {
+        return audioSeparationController?.enqueueDownloadedFile?.(result?.filePath, options?.folder);
+      }
+      return null;
+    },
   });
 
   archiveController = createArchiveController({
@@ -1638,6 +1652,14 @@ const VIC = (() => {
     storeGet,
     storeSet: (key, value) => api?.storeSet?.(key, value),
     enqueueBatchJob: (videos, options) => batchController.enqueueBatchJob(videos, options),
+    showStatus,
+  });
+
+  audioSeparationController = createAudioSeparationController({
+    api,
+    $,
+    storeGet,
+    storeSet: (key, value) => api?.storeSet?.(key, value),
     showStatus,
   });
 

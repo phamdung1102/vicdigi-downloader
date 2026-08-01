@@ -26,6 +26,7 @@ const { checkAppUpdates } = require('./app-updater');
 const { recordYtDlpError } = require('./diagnostics');
 const { runYtDlp, withCommonArgs } = require('./ytdlp-client');
 const DownloadManager = require('../download-manager');
+const audioSeparation = require('./core/audio-separation-service');
 
 let _mainWindow   = null;
 let _caps         = null;
@@ -413,6 +414,28 @@ function _registerBatch() {
 
     return result;
   });
+
+  ipcMain.handle('select-media-file', async () => {
+    const res = await dialog.showOpenDialog(_mainWindow, {
+      properties: ['openFile'],
+      title: 'Chọn video hoặc audio',
+      filters: [{ name: 'Video và audio', extensions: ['mp4', 'mkv', 'webm', 'mov', 'avi', 'mp3', 'wav', 'flac', 'm4a'] }],
+    });
+    return res.canceled ? null : res.filePaths[0];
+  });
+
+  ipcMain.handle('ai-separation-status', async (_event, modelFolder) => audioSeparation.getStatus(app.getPath('userData'), modelFolder));
+  ipcMain.handle('ai-scan-models', async (_event, modelFolder) => audioSeparation.scanModels(modelFolder));
+  ipcMain.handle('ai-install-engine', async event => audioSeparation.installEngine(app.getPath('userData'), message => {
+    if (!event.sender.isDestroyed()) event.sender.send('ai-separation-progress', { phase: 'setup', message });
+  }));
+  ipcMain.handle('ai-separate', async (event, options) => {
+    _requireLicense();
+    return audioSeparation.separate(app.getPath('userData'), { ...options, ffmpegDir: _appDir }, message => {
+      if (!event.sender.isDestroyed()) event.sender.send('ai-separation-progress', { phase: 'separate', message });
+    });
+  });
+  ipcMain.handle('ai-separation-cancel', () => ({ success: audioSeparation.cancel() }));
   ipcMain.handle('show-system-notification', (_event, payload = {}) => {
     if (!Notification.isSupported()) return { success: false };
     new Notification({
