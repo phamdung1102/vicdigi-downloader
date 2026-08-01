@@ -7,8 +7,9 @@
 const { ipcMain, dialog, shell, clipboard, app, BrowserWindow, session, Notification } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
+const { execFile } = require('child_process');
 
-const { isValidYouTubeUrl } = require('./utils');
+const { isValidYouTubeUrl, getExecutablePath } = require('./utils');
 const { getVideoInfo, getVideoInfoMulti } = require('./video-info');
 const { downloadVideo, downloadSubtitle, downloadThumbnail } = require('./downloader');
 const { scanChannelVideos } = require('./core/media/scan-service');
@@ -35,6 +36,46 @@ let _licenseSvc   = null;
 let _activeFacebookScanCancel = null;
 let _facebookLoginWindow = null;
 const FACEBOOK_PARTITION = 'persist:andrew-facebook-scanner';
+const ARCHIVE_INDEX_FILE = '.andrew-archive.json';
+const ARCHIVE_VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.webm', '.mov', '.avi', '.m4v']);
+
+function _archiveVideoId(text = '') {
+  const value = String(text);
+  return value.match(/(?:youtube\.com\/watch\?[^\s]*v=|youtu\.be\/|youtube\.com\/shorts\/)([\w-]{11})/i)?.[1]
+    || value.match(/(?:facebook\.com\/(?:reel|videos)\/)(\d{8,})/i)?.[1]
+    || value.match(/tiktok\.com\/@[^/]+\/video\/(\d{10,})/i)?.[1]
+    || '';
+}
+
+function _normalizeArchiveTitle(value = '') {
+  return path.basename(String(value), path.extname(String(value)))
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/(?:_trimmed|_cropped|_crop|_trim|\.f\d+)+$/gi, '')
+    .replace(/[^a-z0-9]+/gi, ' ').trim().toLowerCase();
+}
+
+function _titleSimilarity(left, right) {
+  const a = new Set(_normalizeArchiveTitle(left).split(' ').filter(word => word.length > 2));
+  const b = new Set(_normalizeArchiveTitle(right).split(' ').filter(word => word.length > 2));
+  if (!a.size || !b.size) return 0;
+  let common = 0;
+  for (const word of a) if (b.has(word)) common++;
+  return common / Math.max(a.size, b.size);
+}
+
+function _probeArchiveFile(ffmpegPath, filePath) {
+  return new Promise(resolve => {
+    execFile(ffmpegPath, ['-hide_banner', '-i', filePath], { windowsHide: true, timeout: 15000, maxBuffer: 2 * 1024 * 1024 }, (error, stdout, stderr) => {
+      const output = `${stdout || ''}\n${stderr || ''}`;
+      const durationMatch = output.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/i);
+      const duration = durationMatch
+        ? Number(durationMatch[1]) * 3600 + Number(durationMatch[2]) * 60 + Number(durationMatch[3])
+        : 0;
+      const title = output.match(/^\s*title\s*:\s*(.+)$/im)?.[1]?.trim() || path.basename(filePath, path.extname(filePath));
+      resolve({ videoId: _archiveVideoId(output), title, duration });
+    });
+  });
+}
 
 async function _getFacebookLoginStatus() {
   const cookies = await session.fromPartition(FACEBOOK_PARTITION).cookies.get({ name: 'c_user' });
@@ -416,7 +457,14 @@ function _registerBatch() {
 
   ipcMain.handle('archive-find-existing', async (_event, payload = {}) => {
     const folder = String(payload.folder || '').trim();
-    const videoIds = [...new Set((Array.isArray(payload.videoIds) ? payload.videoIds : []).map(value => String(value || '').trim()).filter(Boolean))].slice(0, 2000);
+    const videos = (Array.isArray(payload.videos) ? payload.videos : []).map(video => ({
+      videoId: String(video?.videoId || '').trim(),
+      title: String(video?.title || ''),
+      duration: Number(video?.duration) || 0,
+    })).filter(video => video.videoId).slice(0, 2000);
+    const videoIds = videos.length
+      ? videos.map(video => video.videoId)
+      : [...new Set((Array.isArray(payload.videoIds) ? payload.videoIds : []).map(value => String(value || '').trim()).filter(Boolean))].slice(0, 2000);
     if (!folder || !(await fs.pathExists(folder))) return {};
     const files = [];
     const pending = [folder];
@@ -427,14 +475,57 @@ function _registerBatch() {
       for (const entry of entries) {
         const fullPath = path.join(current, entry.name);
         if (entry.isDirectory()) pending.push(fullPath);
-        else if (entry.isFile()) files.push({ name: entry.name, path: fullPath });
+        else if (entry.isFile() && ARCHIVE_VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+          const stat = await fs.stat(fullPath).catch(() => null);
+          if (stat?.size > 1024 * 1024) files.push({ name: entry.name, path: fullPath, size: stat.size, mtimeMs: Math.round(stat.mtimeMs) });
+        }
         if (files.length >= 20000) break;
       }
     }
+    const indexPath = path.join(folder, ARCHIVE_INDEX_FILE);
+    const oldIndex = await fs.readJson(indexPath).catch(() => ({ files: {} }));
+    const nextIndex = { version: 1, updatedAt: new Date().toISOString(), files: {} };
+    const ffmpegPath = getExecutablePath('ffmpeg', _appDir);
+    let cursor = 0;
+    async function probeWorker() {
+      while (cursor < files.length) {
+        const file = files[cursor++];
+        const cached = oldIndex?.files?.[file.path];
+        const metadata = cached?.size === file.size && cached?.mtimeMs === file.mtimeMs
+          ? cached
+          : (ffmpegPath ? await _probeArchiveFile(ffmpegPath, file.path) : { videoId: '', title: file.name, duration: 0 });
+        nextIndex.files[file.path] = { ...metadata, size: file.size, mtimeMs: file.mtimeMs };
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(4, files.length) }, () => probeWorker()));
+    await fs.writeJson(indexPath, nextIndex, { spaces: 2 }).catch(() => {});
+
     const result = {};
+    const usedPaths = new Set();
     for (const videoId of videoIds) {
-      const matched = files.find(file => file.name.includes(`[${videoId}]`) || file.name.includes(videoId));
-      if (matched) result[videoId] = matched.path;
+      const direct = files.find(file => file.name.includes(`[${videoId}]`) || file.name.includes(videoId)
+        || nextIndex.files[file.path]?.videoId === videoId);
+      if (direct && !usedPaths.has(direct.path)) { result[videoId] = direct.path; usedPaths.add(direct.path); continue; }
+      const video = videos.find(item => item.videoId === videoId);
+      if (!video) continue;
+      let best = null;
+      for (const file of files) {
+        if (usedPaths.has(file.path)) continue;
+        const metadata = nextIndex.files[file.path] || {};
+        const similarity = Math.max(_titleSimilarity(file.name, video.title), _titleSimilarity(metadata.title, video.title));
+        const durationOk = !video.duration || !metadata.duration || Math.abs(video.duration - metadata.duration) <= 5;
+        if (durationOk && similarity >= 0.72 && (!best || similarity > best.similarity)) best = { path: file.path, similarity };
+      }
+      if (best) { result[videoId] = best.path; usedPaths.add(best.path); continue; }
+      if (video.duration) {
+        const durationMatches = files.filter(file => !usedPaths.has(file.path)
+          && nextIndex.files[file.path]?.duration
+          && Math.abs(video.duration - nextIndex.files[file.path].duration) <= 2);
+        if (durationMatches.length === 1) {
+          result[videoId] = durationMatches[0].path;
+          usedPaths.add(durationMatches[0].path);
+        }
+      }
     }
     return result;
   });

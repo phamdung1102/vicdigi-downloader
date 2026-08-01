@@ -127,13 +127,17 @@ async function realDownload(url, outputPath, format, quality, onProgress, appDir
       }
       const destination = text.match(/\[download\] Destination: (.+)/);
       if (destination) outputFile = destination[1].trim();
+      const merged = text.match(/\[(?:Merger|VideoConvertor|Fixup\w*)\].*?"([^"]+)"/i);
+      if (merged) outputFile = merged[1].trim();
     });
 
     process.stderr.on('data', data => console.log('[yt-dlp stderr]', data.toString()));
     process.on('close', code => {
       if (code === 0) {
         onProgress(100);
-        resolve({ success: true, filePath: outputFile || outputPath });
+        const extension = path.extname(outputFile).toLowerCase();
+        const finalPath = format !== 'mp3' && ['.m4a', '.part', '.ytdl'].includes(extension) ? outputPath : (outputFile || outputPath);
+        resolve({ success: true, filePath: finalPath });
       } else {
         reject(new Error(`yt-dlp exited with code ${code}`));
       }

@@ -144,7 +144,10 @@ export function createArchiveController(deps) {
       const existingById = new Map(source.items.map(item => [String(item.videoId), item]));
       const currentIds = new Set(videos.map(video => video.videoId));
       const pathStates = await api.archivePathsExist?.(source.items.map(item => item.filePath).filter(Boolean)) || {};
-      const fileMatches = await api.archiveFindExisting?.({ folder: source.folder, videoIds: videos.map(video => video.videoId) }) || {};
+      const fileMatches = await api.archiveFindExisting?.({
+        folder: source.folder,
+        videos: videos.map(video => ({ videoId: video.videoId, title: video.title, duration: video.duration })),
+      }) || {};
       const newlyDiscovered = [];
 
       for (const video of videos) {
