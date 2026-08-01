@@ -897,6 +897,85 @@ select.field {
 }
 .batch-job-fill { height:100%;width:0;background:var(--accent);transition:width .2s ease; }
 
+.archive-header {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:14px;
+}
+.archive-header h2 { margin:0;color:var(--txt-hi);font-size:20px; }
+.archive-header p { margin:5px 0 0;color:var(--txt-lo);font-size:12px; }
+.archive-add-card { margin-bottom:12px; }
+.archive-add-grid {
+  display:grid;
+  grid-template-columns:2fr 1fr 1fr 1fr 150px auto;
+  gap:9px;
+  align-items:end;
+}
+.archive-add-btn { height:34px;white-space:nowrap; }
+.archive-summary {
+  margin:10px 0;
+  color:var(--txt-mid);
+  font-size:12px;
+}
+.archive-source-list { display:flex;flex-direction:column;gap:10px; }
+.archive-source-card {
+  padding:14px;
+  border:1px solid var(--border);
+  border-radius:var(--r-md);
+  background:var(--s2);
+}
+.archive-source-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+.archive-source-name { color:var(--txt-hi);font-size:15px;font-weight:750; }
+.archive-source-url {
+  max-width:760px;
+  margin-top:3px;
+  overflow:hidden;
+  color:var(--txt-lo);
+  font-size:10.5px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.archive-source-actions { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px; }
+.archive-source-stats {
+  display:grid;
+  grid-template-columns:repeat(5,minmax(90px,1fr));
+  gap:8px;
+  margin-top:12px;
+}
+.archive-stat {
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:var(--r-sm);
+  background:var(--s1);
+}
+.archive-stat span { display:block;color:var(--txt-lo);font-size:9.5px;text-transform:uppercase; }
+.archive-stat b { display:block;margin-top:3px;color:var(--txt-hi);font-size:13px; }
+.archive-source-foot {
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:9px;
+  color:var(--txt-lo);
+  font-size:10.5px;
+}
+.archive-status-syncing { color:var(--info); }
+.archive-status-new { color:var(--warn); }
+.archive-status-ok { color:var(--ok); }
+.archive-status-error { color:var(--danger); }
+
+@media (max-width: 1200px) {
+  .archive-add-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .archive-url-field { grid-column:1/-1; }
+  .archive-source-stats { grid-template-columns:repeat(3,minmax(90px,1fr)); }
+}
+
 .dc-chip {
   display: inline-flex;
   align-items: center;

@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openLogsFolder: () => invoke('open-logs-folder'),
   openBrowserExtensionFolder: () => invoke('open-browser-extension-folder'),
   clearPrivateData: () => invoke('clear-private-data'),
+  showSystemNotification: (payload) => invoke('show-system-notification', payload),
   checkAppUpdate: () => invoke('check-app-update'),
 
   // ── System ────────────────────────────────────────────────
@@ -90,6 +91,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ── Batch ─────────────────────────────────────────────────
   scanChannelVideos: (options) => invoke('scan-channel-videos', options),
+  scanArchiveSource: (options) => invoke('scan-archive-source', options),
+  archivePathsExist: (paths) => invoke('archive-paths-exist', paths),
+  archiveFindExisting: (payload) => invoke('archive-find-existing', payload),
   scanFacebookPage: (options) => invoke('scan-facebook-page', options),
   openFacebookLogin: () => invoke('open-facebook-login'),
   getFacebookLoginStatus: () => invoke('get-facebook-login-status'),

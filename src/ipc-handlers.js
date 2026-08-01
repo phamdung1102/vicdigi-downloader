@@ -4,8 +4,9 @@
 // ============================================================
 'use strict';
 
-const { ipcMain, dialog, shell, clipboard, app, BrowserWindow, session } = require('electron');
+const { ipcMain, dialog, shell, clipboard, app, BrowserWindow, session, Notification } = require('electron');
 const fs = require('fs-extra');
+const path = require('path');
 
 const { isValidYouTubeUrl } = require('./utils');
 const { getVideoInfo, getVideoInfoMulti } = require('./video-info');
@@ -368,6 +369,61 @@ function _registerBatch() {
       console.log('Batch scan returned partial recovery result');
     }
 
+    return result;
+  });
+  ipcMain.handle('show-system-notification', (_event, payload = {}) => {
+    if (!Notification.isSupported()) return { success: false };
+    new Notification({
+      title: String(payload.title || 'Andrew Downloader').slice(0, 100),
+      body: String(payload.body || '').slice(0, 220),
+      icon: path.join(_appDir, 'assets', 'icon.ico'),
+    }).show();
+    return { success: true };
+  });
+
+  ipcMain.handle('scan-archive-source', async (_event, opts = {}) => {
+    _requireLicense();
+    const url = String(opts.url || '').trim();
+    const maxVideos = Math.max(1, Math.min(Number(opts.maxVideos) || 100, 1000));
+    if (!url) throw new Error('URL nguồn không được để trống.');
+
+    if (/(^|\.)facebook\.com$/i.test(new URL(url).hostname)) {
+      const result = await scanFacebookPageReels({
+        url,
+        maxVideos,
+        timeoutMs: 180000,
+        waitAfterLoadMs: 2200,
+        scrollPauseMs: 1100,
+      });
+      return { success: true, videos: result?.videos || [], totalFound: result?.videos?.length || 0 };
+    }
+
+    return scanChannelVideos({
+      url,
+      maxVideos,
+      caps: _caps,
+      appDir: _appDir,
+      mockBatch: _mockBatch,
+      onError: error => recordYtDlpError('scan-archive-source', error),
+    });
+  });
+
+  ipcMain.handle('archive-paths-exist', async (_event, paths = []) => {
+    const unique = [...new Set((Array.isArray(paths) ? paths : []).map(value => String(value || '').trim()).filter(Boolean))].slice(0, 2000);
+    const entries = await Promise.all(unique.map(async filePath => [filePath, await fs.pathExists(filePath)]));
+    return Object.fromEntries(entries);
+  });
+
+  ipcMain.handle('archive-find-existing', async (_event, payload = {}) => {
+    const folder = String(payload.folder || '').trim();
+    const videoIds = [...new Set((Array.isArray(payload.videoIds) ? payload.videoIds : []).map(value => String(value || '').trim()).filter(Boolean))].slice(0, 2000);
+    if (!folder || !(await fs.pathExists(folder))) return {};
+    const names = (await fs.readdir(folder)).slice(0, 10000);
+    const result = {};
+    for (const videoId of videoIds) {
+      const matched = names.find(name => name.includes(`[${videoId}]`) || name.includes(videoId));
+      if (matched) result[videoId] = path.join(folder, matched);
+    }
     return result;
   });
 }

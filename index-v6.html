@@ -44,6 +44,10 @@
     <div class="nav-item" id="nav-batch">
       <span>Hàng loạt</span>
     </div>
+    <div class="nav-item" id="nav-archive">
+      <span>Nguồn theo dõi</span>
+      <span class="nav-badge" id="archiveBadge">0</span>
+    </div>
 
     <div class="sidebar-divider"></div>
     <div class="nav-section">Quản lý</div>
@@ -519,6 +523,57 @@
       </div>
 
     </div><!-- /tab-batch -->
+
+    <div class="tab-panel" id="tab-archive">
+      <div class="archive-header">
+        <div>
+          <h2>Nguồn theo dõi</h2>
+          <p>Watch List phát hiện video mới, Archive đối chiếu thư viện và tạo lô tải theo từng nguồn.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" id="archiveSyncAllBtn">Đồng bộ tất cả</button>
+      </div>
+
+      <div class="card archive-add-card">
+        <div class="card-title">Thêm nguồn</div>
+        <div class="archive-add-grid">
+          <div class="field-wrap archive-url-field">
+            <label class="field-label">URL kênh, playlist, Page hoặc profile</label>
+            <input class="field" id="archiveSourceUrl" type="text" placeholder="Dán URL nguồn cần theo dõi…" />
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Tên hiển thị</label>
+            <input class="field" id="archiveSourceName" type="text" placeholder="Tự nhận diện" />
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Khi có video mới</label>
+            <select class="field" id="archiveSourceMode">
+              <option value="queue">Đưa vào chờ xác nhận</option>
+              <option value="auto">Tự động tải</option>
+              <option value="notify">Chỉ thông báo</option>
+            </select>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Kiểm tra định kỳ</label>
+            <select class="field" id="archiveSourceInterval">
+              <option value="0">Chỉ thủ công</option>
+              <option value="15">15 phút</option>
+              <option value="30">30 phút</option>
+              <option value="60">1 giờ</option>
+              <option value="360">6 giờ</option>
+              <option value="1440">Hằng ngày</option>
+            </select>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Số video quét tối đa</label>
+            <input class="field" id="archiveSourceLimit" type="number" min="1" max="1000" value="100" />
+          </div>
+          <button class="btn btn-primary btn-sm archive-add-btn" id="archiveAddSourceBtn">Thêm và quét</button>
+        </div>
+      </div>
+
+      <div class="archive-summary" id="archiveSummary">Chưa có nguồn theo dõi.</div>
+      <div class="archive-source-list" id="archiveSourceList"></div>
+    </div>
 
 
     <!-- ════════════════════════════════════════════════

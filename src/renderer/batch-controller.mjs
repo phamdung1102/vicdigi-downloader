@@ -19,6 +19,7 @@ export function createBatchController(deps) {
     ensureBatchAccess,
     storeGet,
     storeSet,
+    onArchiveVideoResult,
   } = deps;
 
   const BATCH_JOBS_KEY = 'batchDownloadJobs.v1';
@@ -374,12 +375,14 @@ export function createBatchController(deps) {
       });
 
       try {
-        await api.downloadVideo({ url: video.url, outputPath: folder, format, quality, title: video.title || '' });
+        const result = await api.downloadVideo({ url: video.url, outputPath: folder, format, quality, title: video.title || '' });
         done++;
+        await onArchiveVideoResult?.(video, result, null);
       } catch (error) {
         failed++;
         getState().lastBatchFailedVideos.push(video);
         if (job) job.failedVideos.push(video);
+        await onArchiveVideoResult?.(video, null, error);
         console.warn(`Batch failed [${video.title}]:`, error.message);
       } finally {
         removeProgress?.();
@@ -643,5 +646,6 @@ export function createBatchController(deps) {
     resetFilters,
     initializeJobs,
     renderJobs,
+    enqueueBatchJob,
   };
 }

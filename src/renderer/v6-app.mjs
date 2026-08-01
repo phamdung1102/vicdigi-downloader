@@ -2,6 +2,7 @@ import { renderDownloadCenterJobs, renderQualityPills } from './renderers.mjs';
 import { createBatchController } from './batch-controller.mjs';
 import { createHistoryController } from './history-controller.mjs';
 import { createUpdateController } from './update-controller.mjs';
+import { createArchiveController } from './archive-controller.mjs';
 import { DEFAULTS, MAX_BATCH_VIDEOS, MAX_YOUTUBE_BATCH_DELAY_MS, MIN_YOUTUBE_BATCH_DELAY_MS, TEXT } from './messages.mjs';
 
 const api = typeof window !== 'undefined' ? window.electronAPI : null;
@@ -35,6 +36,7 @@ const VIC = (() => {
   let batchController;
   let historyController;
   let updateController;
+  let archiveController;
 
   const $ = id => document.getElementById(id);
   const on = (id, eventName, handler) => $(id)?.addEventListener(eventName, handler);
@@ -85,6 +87,7 @@ const VIC = (() => {
       await loadLicenseStatus();
       await loadAppInfo();
       wireEvents();
+      await archiveController?.initialize?.();
       await batchController?.initializeJobs?.();
       api?.notifyRendererReady?.();
       applyTheme(ui.theme);
@@ -141,9 +144,13 @@ const VIC = (() => {
     on('checkAppUpdateBtn', 'click', checkApplicationUpdate);
     on('nav-single', 'click', () => switchTab('single'));
     on('nav-batch', 'click', () => switchTab('batch'));
+    on('nav-archive', 'click', () => switchTab('archive'));
     on('nav-history', 'click', () => switchTab('history'));
     on('nav-settings', 'click', openSettingsModal);
     on('nav-license', 'click', openLicenseModal);
+    on('archiveAddSourceBtn', 'click', () => archiveController?.addSource?.());
+    on('archiveSyncAllBtn', 'click', () => archiveController?.syncAll?.());
+    $('archiveSourceList')?.addEventListener('click', event => archiveController?.handleClick?.(event));
     on('srcTabChannel', 'click', () => switchBatchSrc('channel'));
     on('srcTabFacebook', 'click', () => {
       switchBatchSrc('facebook');
@@ -900,9 +907,12 @@ const VIC = (() => {
       if ($('urlInput')) { $('urlInput').placeholder = TEXT.placeholders.batchUrl; $('urlInput').value = ''; }
       if ($('getInfoBtn')) $('getInfoBtn').style.display = 'none';
       if ($('scanBtnHeader')) $('scanBtnHeader').style.display = 'inline-flex';
-    } else {
+    } else if (tab === 'single') {
       if ($('urlInput')) $('urlInput').placeholder = TEXT.placeholders.singleUrl;
       if ($('getInfoBtn')) $('getInfoBtn').style.display = 'inline-flex';
+      if ($('scanBtnHeader')) $('scanBtnHeader').style.display = 'none';
+    } else {
+      if ($('getInfoBtn')) $('getInfoBtn').style.display = 'none';
       if ($('scanBtnHeader')) $('scanBtnHeader').style.display = 'none';
     }
     if (tab === 'history') renderHistory();
@@ -1618,6 +1628,16 @@ const VIC = (() => {
     ensureBatchAccess: () => ensureLicenseAccess('tai hang loat'),
     storeGet,
     storeSet: (key, value) => api?.storeSet?.(key, value),
+    onArchiveVideoResult: (video, result, error) => archiveController?.recordDownload?.(video, result, error),
+  });
+
+  archiveController = createArchiveController({
+    api,
+    $,
+    storeGet,
+    storeSet: (key, value) => api?.storeSet?.(key, value),
+    enqueueBatchJob: (videos, options) => batchController.enqueueBatchJob(videos, options),
+    showStatus,
   });
 
   updateController = createUpdateController({
