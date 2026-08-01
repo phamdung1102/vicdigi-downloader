@@ -1,7 +1,7 @@
 const SETTINGS_KEY = 'aiSeparationSettings.v1';
 
 export function createAudioSeparationController({ api, $, storeGet, storeSet, showStatus }) {
-  let settings = { modelFolder: '', outputFolder: '', input: '', mode: 'background', quality: 'balanced', format: 'wav', model: '', autoAfterDownload: false, autoAfterBatch: false };
+  let settings = { modelFolder: '', outputFolder: '', input: '', mode: 'background', quality: 'balanced', format: 'wav', model: '', autoAfterDownload: false, autoAfterBatch: false, mergeVideo: false, mergeStem: 'Instrumental' };
   let models = [];
   let running = false;
   const autoQueue = [];
@@ -24,6 +24,8 @@ export function createAudioSeparationController({ api, $, storeGet, storeSet, sh
       model: $('aiModel')?.value || settings.model,
       autoAfterDownload: Boolean($('autoSeparateAudio')?.checked),
       autoAfterBatch: Boolean($('autoSeparateBatch')?.checked),
+      mergeVideo: Boolean($('aiMergeVideo')?.checked),
+      mergeStem: $('aiMergeStem')?.value || 'Instrumental',
     };
     await storeSet(SETTINGS_KEY, settings);
   }
@@ -35,6 +37,8 @@ export function createAudioSeparationController({ api, $, storeGet, storeSet, sh
     }
     if ($('autoSeparateAudio')) $('autoSeparateAudio').checked = Boolean(settings.autoAfterDownload);
     if ($('autoSeparateBatch')) $('autoSeparateBatch').checked = Boolean(settings.autoAfterBatch);
+    if ($('aiMergeVideo')) $('aiMergeVideo').checked = Boolean(settings.mergeVideo);
+    if ($('aiMergeStem')) { $('aiMergeStem').value = settings.mergeStem || 'Instrumental'; $('aiMergeStem').disabled = !settings.mergeVideo; }
     api?.onAiSeparationProgress?.(payload => updateProgress(payload?.message || 'Đang xử lý…'));
     await refreshStatus();
   }
@@ -110,7 +114,7 @@ export function createAudioSeparationController({ api, $, storeGet, storeSet, sh
       await ensureEngine();
       const quality = settings.mode === 'stems4' ? 'stems4' : settings.quality;
       const result = await api.separateAudio?.({ ...settings, quality, modelDir: settings.modelFolder, outputDir: settings.outputFolder });
-      updateProgress('Hoàn tất. Các track đã được xuất.');
+      updateProgress(result?.mergedVideo ? 'Hoàn tất. Track AI đã được ghép vào video mới.' : 'Hoàn tất. Các track đã được xuất.');
       showStatus('Tách nhạc AI hoàn tất.', 'ok');
       if (result?.outputDir) api.showSystemNotification?.({ title: 'Tách nhạc hoàn tất', body: 'Các track AI đã sẵn sàng.' });
     } catch (error) {
@@ -183,6 +187,8 @@ export function createAudioSeparationController({ api, $, storeGet, storeSet, sh
     ['aiMode', 'aiQuality', 'aiFormat', 'aiModel'].forEach(id => $(id)?.addEventListener('change', persist));
     $('autoSeparateAudio')?.addEventListener('change', persist);
     $('autoSeparateBatch')?.addEventListener('change', persist);
+    $('aiMergeVideo')?.addEventListener('change', async () => { $('aiMergeStem').disabled = !$('aiMergeVideo').checked; await persist(); });
+    $('aiMergeStem')?.addEventListener('change', persist);
   }
 
   return { initialize, wire, refreshStatus, enqueueDownloadedFile };

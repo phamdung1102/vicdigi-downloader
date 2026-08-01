@@ -137,6 +137,7 @@ async function separate(userData, options, onLog) {
   if (!outputDir) throw new Error('Chưa chọn thư mục xuất kết quả.');
   await fs.ensureDir(outputDir);
   await fs.ensureDir(modelDir);
+  const beforeFiles = new Set((await fs.readdir(outputDir).catch(() => [])).map(name => path.join(outputDir, name)));
   const presets = {
     fast: 'UVR_MDXNET_KARA_2.onnx',
     balanced: 'UVR-MDX-NET-Inst_HQ_3.onnx',
@@ -146,13 +147,34 @@ async function separate(userData, options, onLog) {
   const model = String(options.model || presets[options.quality] || presets.balanced);
   if (path.isAbsolute(model) && await fs.pathExists(model)) modelDir = path.dirname(model);
   const args = [input, '--model_filename', path.basename(model), '--model_file_dir', modelDir, '--output_dir', outputDir, '--output_format', String(options.format || 'WAV').toUpperCase()];
-  if (options.mode === 'background') args.push('--single_stem', 'Instrumental');
-  if (options.mode === 'voice') args.push('--single_stem', 'Vocals');
+  if (options.mode === 'background' && !options.mergeVideo) args.push('--single_stem', 'Instrumental');
+  if (options.mode === 'voice' && !options.mergeVideo) args.push('--single_stem', 'Vocals');
   if (options.quality === 'fast') args.push('--mdx_segment_size', '128', '--mdx_overlap', '8');
   if (options.quality === 'high') args.push('--mdxc_overlap', '12');
   onLog?.(`Đang dùng model ${path.basename(model)}…`);
   await run(paths.cli, args, onLog, { cwd: outputDir, env: { ...process.env, PATH: `${path.dirname(paths.python)};${String(options.ffmpegDir || '')};${path.dirname(process.execPath)};${process.env.PATH}` } });
-  return { success: true, outputDir, model: path.basename(model) };
+  const outputFiles = (await fs.readdir(outputDir).catch(() => []))
+    .map(name => path.join(outputDir, name))
+    .filter(filePath => !beforeFiles.has(filePath));
+  let mergedVideo = '';
+  if (options.mergeVideo && /\.(?:mp4|mkv|webm|mov|avi)$/i.test(input)) {
+    const requestedStem = String(options.mergeStem || 'Instrumental');
+    const stemFile = outputFiles.find(filePath => path.basename(filePath).toLowerCase().includes(`(${requestedStem.toLowerCase()})`))
+      || outputFiles.find(filePath => path.basename(filePath).toLowerCase().includes(requestedStem.toLowerCase()));
+    if (!stemFile) throw new Error(`Đã tách track nhưng không tìm thấy ${requestedStem} để ghép video.`);
+    const cleanBase = path.basename(input, path.extname(input)).replace(/[<>:"/\\|?*]+/g, '').slice(0, 120);
+    mergedVideo = path.join(outputDir, `${cleanBase} [${requestedStem}].mp4`);
+    const bundledFfmpeg = path.join(String(options.ffmpegDir || ''), 'ffmpeg.exe');
+    const ffmpeg = await fs.pathExists(bundledFfmpeg) ? bundledFfmpeg : 'ffmpeg';
+    onLog?.(`Đang ghép track ${requestedStem} trở lại video…`);
+    await run(ffmpeg, ['-y', '-i', input, '-i', stemFile, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', '-shortest', mergedVideo], onLog);
+    // The separated tracks are temporary when the user requests a merged
+    // video. Keep only the finished MP4 in the result folder.
+    await Promise.all(outputFiles.map(filePath => fs.remove(filePath).catch(() => {})));
+    outputFiles.splice(0, outputFiles.length, mergedVideo);
+    onLog?.('Đã ghép xong và dọn các track âm thanh tạm.');
+  }
+  return { success: true, outputDir, outputFiles, mergedVideo, model: path.basename(model) };
 }
 
 function cancel() {

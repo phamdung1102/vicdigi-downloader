@@ -546,6 +546,10 @@
             <div class="field-wrap"><label class="field-label">Model</label><select class="field" id="aiModel"><option value="">Tự chọn model phù hợp</option></select></div>
           </div>
           <div class="field-wrap"><label class="field-label">Thư mục xuất</label><div class="folder-row"><input class="field" id="aiOutputFolder" readonly placeholder="Chọn nơi lưu các track…"><button class="btn btn-ghost btn-sm" id="aiChooseOutputBtn">Chọn</button></div></div>
+          <div class="ai-merge-panel">
+            <label class="ai-merge-toggle"><input type="checkbox" id="aiMergeVideo"> <span><b>Ghép track AI trở lại video</b><small>Giữ nguyên hình ảnh, thay âm thanh và xuất một video MP4 mới.</small></span></label>
+            <div class="field-wrap"><label class="field-label">Track dùng để ghép</label><select class="field" id="aiMergeStem" disabled><option value="Instrumental">Nhạc nền / Instrumental</option><option value="Vocals">Giọng nói / Vocal</option><option value="Other">Âm thanh khác / Other</option></select></div>
+          </div>
           <div class="ai-progress" id="aiProgress"><div class="ai-progress-orbit"><span></span></div><div><b>Trạng thái xử lý</b><span id="aiProgressText">Sẵn sàng nhận video.</span></div></div>
           <div class="ai-run-actions"><button class="btn btn-primary" id="aiStartBtn">Bắt đầu tách nhạc</button><button class="btn btn-danger" id="aiCancelBtn" style="display:none">Dừng</button></div>
         </section>

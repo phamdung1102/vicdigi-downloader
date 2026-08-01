@@ -309,89 +309,100 @@ class QueueService extends EventBus {
   }
 
   async downloadYouTube(download) {
-    return new Promise((resolve, reject) => {
+    if (download.status === 'cancelled') throw new Error('Download was cancelled');
+
+    const outputTemplate = path.join(download.outputPath, '%(title)s.%(ext)s');
+    const stateFile = path.join(download.outputPath, `.${download.id}.state`);
+    const partialFile = this.downloadStates.get(download.id)?.partialFile;
+    const baseArgs = [
+      '--format', this.getFormatSelector(download.quality, download.format),
+      '--output', outputTemplate,
+      '--print', 'after_move:filepath',
+      '--no-playlist', '--newline', '--no-check-certificates',
+      '--concurrent-fragments', '8', '--buffer-size', '32K', '--http-chunk-size', '10M',
+      '--retries', '10', '--fragment-retries', '10',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    ];
+    if (partialFile && fs.existsSync(partialFile)) baseArgs.push('--continue');
+    if (download.format === 'mp3') baseArgs.push('--extract-audio', '--audio-format', 'mp3', '--audio-quality', '192K');
+
+    // Public clients are always attempted first. Cookies are an optional last
+    // resort only when the user has explicitly selected a cookies.txt file.
+    const attempts = [
+      { name: 'YouTube public', args: [] },
+      { name: 'YouTube web/mobile fallback', args: ['--extractor-args', 'youtube:player_client=web_safari,mweb,android_vr'] },
+      { name: 'YouTube embedded fallback', args: ['--extractor-args', 'youtube:player_client=tv_embedded,web'] },
+    ];
+    const cookieFile = this.getCookieFilePath();
+    if (cookieFile) attempts.push({ name: 'YouTube cookies.txt fallback', args: ['--cookies', cookieFile] });
+
+    const cleanupState = keepForResume => {
+      if (!keepForResume && fs.existsSync(stateFile)) fs.removeSync(stateFile);
+      if (!keepForResume) this.downloadStates.delete(download.id);
+    };
+    const failures = [];
+
+    for (const attempt of attempts) {
+      if (download.status === 'paused') {
+        cleanupState(true);
+        throw new Error('Download paused');
+      }
       if (download.status === 'cancelled') {
-        return reject(new Error('Download was cancelled'));
+        cleanupState(false);
+        throw new Error('Download cancelled');
       }
 
-      const outputTemplate = path.join(download.outputPath, '%(title)s.%(ext)s');
-      const stateFile = path.join(download.outputPath, `.${download.id}.state`);
-      const partialFile = this.downloadStates.get(download.id)?.partialFile;
-      const args = [
-        '--format', this.getFormatSelector(download.quality, download.format),
-        '--output', outputTemplate,
-        '--no-playlist',
-        '--newline',
-        '--no-check-certificates',
-        '--concurrent-fragments', '8',
-        '--buffer-size', '32K',
-        '--http-chunk-size', '10M',
-        '--retries', '10',
-        '--fragment-retries', '10',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      ];
+      try {
+        const outputFile = await new Promise((resolve, reject) => {
+          const proc = spawn(resolveYtDlpPath(this.rootDir), [...attempt.args, ...baseArgs, download.url]);
+          let resolvedFile = '';
+          let stderr = '';
+          this.trackActiveProcess(download.id, proc);
 
-      if (partialFile && fs.existsSync(partialFile)) {
-        args.push('--continue');
-      }
-
-      if (download.format === 'mp3') {
-        args.push('--extract-audio', '--audio-format', 'mp3', '--audio-quality', '192K');
-      }
-
-      args.push(download.url);
-
-      const ytdlpProcess = spawn(resolveYtDlpPath(this.rootDir), args);
-      let outputFile = '';
-
-      const cleanupState = (keepForResume = false) => {
-        if (!keepForResume && fs.existsSync(stateFile)) {
-          fs.removeSync(stateFile);
-        }
-        if (!keepForResume) {
-          this.downloadStates.delete(download.id);
-        }
-      };
-
-      ytdlpProcess.stdout.on('data', data => {
-        const output = data.toString();
-        this.emitProgress(download, output);
-        const fileMatch = output.match(/\[download\] Destination: (.+)/);
-        if (fileMatch) {
-          outputFile = fileMatch[1];
-          this.downloadStates.set(download.id, {
-            partialFile: `${outputFile}.part`,
-            outputFile,
+          proc.stdout.on('data', data => {
+            const output = data.toString();
+            this.emitProgress(download, output);
+            const destination = output.match(/\[download\] Destination: (.+)/);
+            const merged = output.match(/\[(?:Merger|VideoConvertor|Fixup\w*)\].*?"([^"]+)"/i);
+            const printed = output.split(/\r?\n/).map(line => line.trim()).find(line => path.isAbsolute(line));
+            resolvedFile = printed || merged?.[1] || destination?.[1]?.trim() || resolvedFile;
+            if (destination?.[1]) {
+              const state = { partialFile: `${destination[1].trim()}.part`, outputFile: destination[1].trim() };
+              this.downloadStates.set(download.id, state);
+              fs.writeJsonSync(stateFile, state);
+            }
           });
-          fs.writeJsonSync(stateFile, this.downloadStates.get(download.id));
-        }
-      });
+          proc.stderr.on('data', data => { stderr += data.toString(); });
+          proc.once('error', reject);
+          proc.once('close', code => {
+            if (code === 0) resolve(resolvedFile);
+            else reject(new Error(stderr.trim() || `yt-dlp exited with code ${code}`));
+          });
+        });
 
-      ytdlpProcess.stderr.on('data', data => {
-        console.error('yt-dlp error:', data.toString());
-      });
-
-      ytdlpProcess.on('close', code => {
-        if (code === 0) {
-          cleanupState(false);
-          download.outputFile = outputFile;
-          this.persistSnapshot();
-          resolve(download);
-        } else if (download.status === 'paused') {
+        cleanupState(false);
+        download.outputFile = outputFile;
+        this.persistSnapshot();
+        return download;
+      } catch (error) {
+        if (download.status === 'paused') {
           cleanupState(true);
-          reject(new Error('Download paused'));
-        } else if (download.status === 'cancelled') {
-          cleanupState(false);
-          reject(new Error('Download cancelled'));
-        } else {
-          cleanupState(false);
-          reject(new Error(`Download failed with code ${code}`));
+          throw new Error('Download paused');
         }
-      });
+        if (download.status === 'cancelled') {
+          cleanupState(false);
+          throw new Error('Download cancelled');
+        }
+        failures.push(`${attempt.name}: ${error.message || error}`);
+      }
+    }
 
-      this.trackActiveProcess(download.id, ytdlpProcess);
-      ytdlpProcess.on('error', reject);
-    });
+    cleanupState(false);
+    const details = failures.at(-1) || 'Không lấy được dữ liệu video.';
+    if (/sign in to confirm|not a bot/i.test(details)) {
+      throw new Error('YouTube tạm yêu cầu xác minh truy cập. App đã thử các client công khai nhưng chưa vượt qua; hãy đợi một lúc hoặc đổi mạng rồi tải lại.');
+    }
+    throw new Error(`YouTube tải thất bại: ${details.substring(0, 500)}`);
   }
 
   async downloadInstagram(download) {
