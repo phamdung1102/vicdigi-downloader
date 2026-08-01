@@ -162,7 +162,7 @@ function _registerVideo() {
 
   ipcMain.handle('download-video', async (event, opts) => {
     _requireLicense();
-    const { url, outputPath, format, quality, title, filenameTemplate, conflictPolicy, embedMetadata, embedThumbnail, clipStartSeconds, clipEndSeconds } = opts;
+    const { url, outputPath, format, quality, title, filenameTemplate, conflictPolicy, embedMetadata, embedThumbnail, clipStartSeconds, clipEndSeconds, requestId } = opts;
     if (!url || !outputPath) throw new Error('url và outputPath là bắt buộc');
 
     const platform = DownloadManager.detectPlatform(url);
@@ -179,12 +179,13 @@ function _registerVideo() {
         title: title || `${platform}_${Date.now()}`,
         clipStartSeconds,
         clipEndSeconds,
+        requestId: String(requestId || ''),
       });
     }
 
     // YouTube / generic
     const onProgress = pct =>
-      event.sender.send('download-progress', { percent: pct });
+      event.sender.send('download-progress', { percent: pct, requestId: String(requestId || '') });
 
     return downloadVideo({
       url, outputPath, format, quality, filenameTemplate, conflictPolicy, embedMetadata, embedThumbnail,
@@ -687,6 +688,7 @@ async function _runManagedDownload(event, info) {
     if (payload?.id !== id) return;
     event.sender.send('download-progress', {
       percent: payload.progress || 0,
+      requestId: String(info.requestId || ''),
       downloadedBytes: payload.downloadedBytes || 0,
       totalBytes: payload.totalBytes || 0,
       downloadSpeed: payload.downloadSpeed || 0,

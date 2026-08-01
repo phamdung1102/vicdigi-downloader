@@ -102,7 +102,7 @@ export function createBatchController(deps) {
 
   async function initializeJobs() {
     const stored = await storeGet?.(BATCH_JOBS_KEY);
-    batchJobs = (Array.isArray(stored) ? stored : []).map(safeJob).map(job => (
+    batchJobs = (Array.isArray(stored) ? stored : []).map(safeJob).filter(job => job.sourceMode !== 'archive').map(job => (
       job.status === 'running' ? { ...job, status: 'queued' } : job
     ));
     renderJobs();

@@ -1,10 +1,11 @@
 const STORE_KEY = 'archiveSources.v1';
 
 export function createArchiveController(deps) {
-  const { api, $, storeGet, storeSet, enqueueBatchJob, showStatus } = deps;
+  const { api, $, storeGet, storeSet, showStatus } = deps;
   let sources = [];
   let scheduler = null;
   let schedulerBusy = false;
+  let archiveQueueBusy = false;
 
   const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
@@ -28,6 +29,21 @@ export function createArchiveController(deps) {
       items: Array.isArray(source.items) ? source.items : [],
       pendingIds: Array.isArray(source.pendingIds) ? source.pendingIds : [],
       removedIds: Array.isArray(source.removedIds) ? source.removedIds : [],
+      baselineReady: source.baselineReady === true || Boolean(source.lastCheckedAt),
+      autoRestore: source.autoRestore === true,
+      format: String(source.format || 'mp4'),
+      quality: String(source.quality || '1080p'),
+      download: {
+        status: ['idle', 'queued', 'running', 'stopped', 'completed', 'failed'].includes(source.download?.status)
+          ? (source.download.status === 'running' ? 'stopped' : source.download.status) : 'idle',
+        ids: Array.isArray(source.download?.ids) ? source.download.ids : [],
+        index: Math.max(0, Number(source.download?.index) || 0),
+        done: Math.max(0, Number(source.download?.done) || 0),
+        failed: Math.max(0, Number(source.download?.failed) || 0),
+        progress: 0,
+        currentTitle: '',
+        stopRequested: false,
+      },
     };
   }
 
@@ -50,6 +66,7 @@ export function createArchiveController(deps) {
     render();
     scheduler = setInterval(checkDueSources, 60_000);
     setTimeout(checkDueSources, 8_000);
+    if (sources.some(source => source.download.status === 'queued')) processArchiveQueue();
   }
 
   function videoIdOf(video = {}) {
@@ -149,6 +166,9 @@ export function createArchiveController(deps) {
         videos: videos.map(video => ({ videoId: video.videoId, title: video.title, duration: video.duration })),
       }) || {};
       const newlyDiscovered = [];
+      const newIds = [];
+      const missingIds = [];
+      const hadBaseline = source.baselineReady;
 
       for (const video of videos) {
         const old = existingById.get(video.videoId);
@@ -157,6 +177,8 @@ export function createArchiveController(deps) {
         const next = { ...old, ...video, status, filePath, firstSeenAt: old?.firstSeenAt || video.firstSeenAt };
         existingById.set(video.videoId, next);
         if (!old || status === 'missing') newlyDiscovered.push(next);
+        if (!old) newIds.push(next.videoId);
+        else if (status === 'missing') missingIds.push(next.videoId);
       }
 
       // Chỉ kết luận "không còn trên nguồn" khi lượt quét kết thúc trước giới hạn.
@@ -173,6 +195,7 @@ export function createArchiveController(deps) {
       if (newlyDiscovered.length) source.lastChangedAt = source.lastCheckedAt;
       source.status = newlyDiscovered.length ? 'new' : 'ok';
       source.message = newlyDiscovered.length ? `${newlyDiscovered.length} video mới hoặc còn thiếu` : 'Thư viện đã đồng bộ';
+      source.baselineReady = true;
       await persist();
       render();
 
@@ -183,7 +206,10 @@ export function createArchiveController(deps) {
         });
       }
 
-      if (source.mode === 'auto' && source.pendingIds.length) await downloadPending(source.id);
+      const autoIds = hadBaseline && source.mode === 'auto'
+        ? [...newIds, ...(source.autoRestore ? missingIds : [])]
+        : [];
+      if (autoIds.length) await downloadPending(source.id, autoIds);
       else if (manual) showStatus(`${source.name}: ${source.message}`, newlyDiscovered.length ? 'info' : 'ok');
     } catch (error) {
       source.status = 'error';
@@ -195,28 +221,112 @@ export function createArchiveController(deps) {
     }
   }
 
-  async function downloadPending(sourceId) {
+  async function downloadPending(sourceId, selectedIds = null) {
     const source = sources.find(item => item.id === sourceId);
     if (!source) return;
-    const pending = source.items.filter(item => source.pendingIds.includes(item.videoId) && item.status !== 'archived');
+    const allowedIds = new Set(Array.isArray(selectedIds) && selectedIds.length ? selectedIds : source.pendingIds);
+    const pending = source.items.filter(item => allowedIds.has(item.videoId) && item.status !== 'archived');
     if (!pending.length) return showStatus(`${source.name}: không có video cần tải.`, 'info');
     pending.forEach(item => { item.status = 'queued'; });
-    source.status = 'queued';
-    source.message = `${pending.length} video đã đưa vào hàng đợi`;
+    source.download = { status: 'queued', ids: pending.map(item => item.videoId), index: 0, done: 0, failed: 0, progress: 0, currentTitle: '', stopRequested: false };
+    source.message = `${pending.length} video đang chờ trong nguồn này`;
     await persist();
     render();
-    await enqueueBatchJob(pending.map(video => ({
-      ...video,
-      archiveSourceId: source.id,
-      archiveVideoId: video.videoId,
-    })), {
-      name: `${source.name} — ${pending.length} video`,
-      folder: source.folder,
-      format: 'mp4',
-      quality: '1080p',
-      sourceMode: 'archive',
-      historyTitle: `${source.name} — Archive Sync`,
-    });
+    processArchiveQueue().catch(error => console.warn('Archive queue failed:', error));
+  }
+
+  async function processArchiveQueue() {
+    if (archiveQueueBusy) return;
+    archiveQueueBusy = true;
+    try {
+      while (true) {
+        const source = sources.find(item => item.download.status === 'queued');
+        if (!source) break;
+        source.download.status = 'running';
+        source.download.stopRequested = false;
+        await persist();
+        render();
+        for (let index = source.download.index; index < source.download.ids.length; index++) {
+          if (source.download.stopRequested) break;
+          const videoId = source.download.ids[index];
+          const video = source.items.find(item => item.videoId === videoId);
+          source.download.index = index;
+          source.download.currentTitle = video?.title || videoId;
+          source.download.progress = 0;
+          if (!video) continue;
+          video.status = 'downloading';
+          render();
+          const requestId = `${source.id}:${video.videoId}`;
+          const removeProgress = api?.onDownloadProgress?.(data => {
+            if (data?.requestId !== requestId) return;
+            source.download.progress = Math.max(0, Math.min(100, Number(data?.percent) || 0));
+            render();
+          });
+          try {
+            const result = await api.downloadVideo({
+              url: video.url,
+              outputPath: source.folder,
+              format: source.format,
+              quality: source.quality,
+              title: video.title || '',
+              embedMetadata: true,
+              requestId,
+            });
+            video.status = 'archived';
+            if (result?.filePath) video.filePath = result.filePath;
+            source.pendingIds = source.pendingIds.filter(id => id !== video.videoId);
+            source.download.done++;
+          } catch (error) {
+            video.status = 'failed';
+            video.error = error?.message || 'Tải thất bại';
+            source.download.failed++;
+          } finally {
+            removeProgress?.();
+          }
+          source.download.index = index + 1;
+          await persist();
+          render();
+        }
+        const stopped = source.download.stopRequested;
+        source.download.status = stopped ? 'stopped' : (source.download.failed ? 'failed' : 'completed');
+        source.download.progress = stopped ? source.download.progress : 100;
+        source.download.currentTitle = '';
+        source.status = source.pendingIds.length ? 'new' : 'ok';
+        source.message = stopped
+          ? `Đã dừng · ${source.download.done}/${source.download.ids.length} video`
+          : `Tải xong ${source.download.done}/${source.download.ids.length} video${source.download.failed ? ` · lỗi ${source.download.failed}` : ''}`;
+        await persist();
+        render();
+      }
+    } finally {
+      archiveQueueBusy = false;
+    }
+  }
+
+  async function stopSourceDownload(sourceId) {
+    const source = sources.find(item => item.id === sourceId);
+    if (!source || !['running', 'queued'].includes(source.download.status)) return;
+    source.download.stopRequested = true;
+    if (source.download.status === 'queued') source.download.status = 'stopped';
+    source.message = 'Đang dừng sau video hiện tại…';
+    await persist();
+    render();
+  }
+
+  async function toggleAuto(sourceId) {
+    const source = sources.find(item => item.id === sourceId);
+    if (!source) return;
+    source.mode = source.mode === 'auto' ? 'queue' : 'auto';
+    await persist();
+    render();
+  }
+
+  async function toggleRestore(sourceId) {
+    const source = sources.find(item => item.id === sourceId);
+    if (!source) return;
+    source.autoRestore = !source.autoRestore;
+    await persist();
+    render();
   }
 
   async function recordDownload(video, result = null, error = null) {
@@ -234,6 +344,10 @@ export function createArchiveController(deps) {
   }
 
   async function removeSource(sourceId) {
+    const target = sources.find(source => source.id === sourceId);
+    if (target && ['queued', 'running'].includes(target.download.status)) {
+      return showStatus('Hãy dừng tải của nguồn trước khi xóa.', 'warn');
+    }
     sources = sources.filter(source => source.id !== sourceId);
     await persist();
     render();
@@ -274,10 +388,15 @@ export function createArchiveController(deps) {
       const missing = source.items.filter(item => item.status === 'missing' || item.status === 'failed').length;
       const mode = source.mode === 'auto' ? 'Tự động tải' : source.mode === 'notify' ? 'Chỉ thông báo' : 'Chờ xác nhận';
       const checked = source.lastCheckedAt ? new Date(source.lastCheckedAt).toLocaleString('vi-VN') : 'Chưa quét';
+      const download = source.download;
+      const processed = Math.min(download.ids.length, download.done + download.failed);
+      const overall = download.ids.length ? Math.round(((processed + (download.status === 'running' ? download.progress / 100 : 0)) / download.ids.length) * 100) : 0;
+      const isDownloading = ['queued', 'running'].includes(download.status);
       return `<div class="archive-source-card" data-source-id="${escapeHtml(source.id)}">
         <div class="archive-source-head"><div><div class="archive-source-name">${escapeHtml(source.name)}</div><div class="archive-source-url">${escapeHtml(source.platform)} · ${escapeHtml(source.url)}</div><div class="archive-source-folder">Thư viện: ${escapeHtml(source.folder || 'Chưa chọn')}</div></div>
-        <div class="archive-source-actions"><button class="btn btn-ghost btn-xs" data-action="folder">Đổi thư mục</button><button class="btn btn-ghost btn-xs" data-action="sync">Đồng bộ</button>${source.pendingIds.length ? `<button class="btn btn-primary btn-xs" data-action="download">Tải ${source.pendingIds.length} mới</button>` : ''}<button class="btn btn-danger btn-xs" data-action="remove">Xóa nguồn</button></div></div>
+        <div class="archive-source-actions"><button class="btn btn-ghost btn-xs ${source.mode === 'auto' ? 'active' : ''}" data-action="auto">Tự tải: ${source.mode === 'auto' ? 'Bật' : 'Tắt'}</button><button class="btn btn-ghost btn-xs ${source.autoRestore ? 'active' : ''}" data-action="restore">Khôi phục: ${source.autoRestore ? 'Bật' : 'Tắt'}</button><button class="btn btn-ghost btn-xs" data-action="folder">Đổi thư mục</button><button class="btn btn-ghost btn-xs" data-action="sync">Đồng bộ</button>${source.pendingIds.length && !isDownloading ? `<button class="btn btn-primary btn-xs" data-action="download">Tải ${source.pendingIds.length}</button>` : ''}${isDownloading ? '<button class="btn btn-danger btn-xs" data-action="stop">Dừng tải</button>' : ''}<button class="btn btn-danger btn-xs" data-action="remove">Xóa nguồn</button></div></div>
         <div class="archive-source-stats"><div class="archive-stat"><span>Đã phát hiện</span><b>${source.items.length}</b></div><div class="archive-stat"><span>Đã lưu</span><b>${archived}</b></div><div class="archive-stat"><span>Mới/chờ</span><b>${source.pendingIds.length}</b></div><div class="archive-stat"><span>Thiếu/lỗi</span><b>${missing}</b></div><div class="archive-stat"><span>Không còn thấy</span><b>${source.removedIds.length}</b></div></div>
+        ${download.ids.length ? `<div class="archive-download"><div class="archive-download-meta"><span>${isDownloading ? escapeHtml(download.currentTitle || 'Đang chuẩn bị…') : escapeHtml(source.message)}</span><b>${processed}/${download.ids.length} · ${overall}%</b></div><div class="archive-download-track"><div class="archive-download-fill" style="width:${overall}%"></div></div></div>` : ''}
         <div class="archive-source-foot"><span class="archive-status-${escapeHtml(source.status)}">${escapeHtml(source.message || 'Sẵn sàng')}</span><span>${escapeHtml(mode)} · ${escapeHtml(checked)}</span></div>
       </div>`;
     }).join('');
@@ -288,6 +407,9 @@ export function createArchiveController(deps) {
     const card = button?.closest('[data-source-id]');
     if (!button || !card) return;
     const sourceId = card.dataset.sourceId;
+    if (button.dataset.action === 'auto') toggleAuto(sourceId);
+    if (button.dataset.action === 'restore') toggleRestore(sourceId);
+    if (button.dataset.action === 'stop') stopSourceDownload(sourceId);
     if (button.dataset.action === 'folder') changeSourceFolder(sourceId);
     if (button.dataset.action === 'sync') syncSource(sourceId, { manual: true });
     if (button.dataset.action === 'download') downloadPending(sourceId);
