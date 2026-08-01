@@ -66,6 +66,33 @@ async function downloadThumbnail(opts) {
 }
 
 async function realDownload(url, outputPath, format, quality, onProgress, appDir, options = {}) {
+  const isYouTube = /(?:youtube\.com|youtu\.be)/i.test(url);
+  const attempts = isYouTube ? [
+    [],
+    ['--extractor-args', 'youtube:player_client=web_safari,mweb,android_vr'],
+    ['--extractor-args', 'youtube:player_client=tv_embedded,web'],
+  ] : [[]];
+  if (isYouTube && options.cookiesPath && await fs.pathExists(options.cookiesPath)) {
+    attempts.push(['--cookies', options.cookiesPath]);
+  }
+
+  const failures = [];
+  for (const extraArgs of attempts) {
+    try {
+      return await realDownloadAttempt(url, outputPath, format, quality, onProgress, appDir, { ...options, extraArgs });
+    } catch (error) {
+      failures.push(error.message || String(error));
+    }
+  }
+
+  const details = failures.at(-1) || 'Không lấy được dữ liệu video.';
+  if (/sign in to confirm|not a bot/i.test(details)) {
+    throw new Error('YouTube tạm yêu cầu xác minh truy cập. App đã thử các client công khai nhưng chưa thành công; hãy đợi một lúc hoặc đổi mạng rồi tải lại.');
+  }
+  throw new Error(`Không tải được video: ${details.substring(0, 500)}`);
+}
+
+async function realDownloadAttempt(url, outputPath, format, quality, onProgress, appDir, options = {}) {
   return new Promise((resolve, reject) => {
     const formatSelector = format === 'mp3'
       ? 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio'
@@ -82,8 +109,11 @@ async function realDownload(url, outputPath, format, quality, onProgress, appDir
       outputTemplate = outputTemplate.replace('.%(ext)s', ' [%(id)s].%(ext)s');
     }
     const args = withCommonArgs([
+      '--ignore-config',
+      ...(options.extraArgs || []),
       '--format', formatSelector,
       '--output', path.join(outputPath, outputTemplate),
+      '--print', 'after_move:filepath',
       '--no-playlist', '--newline',
       '--merge-output-format', 'mp4',
       '--concurrent-fragments', '4',
@@ -114,6 +144,7 @@ async function realDownload(url, outputPath, format, quality, onProgress, appDir
     const process = spawnYtDlp(args, { appDir });
     let outputFile = '';
     let lastPercent = 0;
+    let errorOutput = '';
 
     process.stdout.on('data', data => {
       const text = data.toString();
@@ -129,9 +160,11 @@ async function realDownload(url, outputPath, format, quality, onProgress, appDir
       if (destination) outputFile = destination[1].trim();
       const merged = text.match(/\[(?:Merger|VideoConvertor|Fixup\w*)\].*?"([^"]+)"/i);
       if (merged) outputFile = merged[1].trim();
+      const printed = text.split(/\r?\n/).map(line => line.trim()).find(line => path.isAbsolute(line));
+      if (printed) outputFile = printed;
     });
 
-    process.stderr.on('data', data => console.log('[yt-dlp stderr]', data.toString()));
+    process.stderr.on('data', data => { errorOutput += data.toString(); });
     process.on('close', code => {
       if (code === 0) {
         onProgress(100);
@@ -139,7 +172,7 @@ async function realDownload(url, outputPath, format, quality, onProgress, appDir
         const finalPath = format !== 'mp3' && ['.m4a', '.part', '.ytdl'].includes(extension) ? outputPath : (outputFile || outputPath);
         resolve({ success: true, filePath: finalPath });
       } else {
-        reject(new Error(`yt-dlp exited with code ${code}`));
+        reject(new Error(errorOutput.trim() || `yt-dlp exited with code ${code}`));
       }
     });
     process.on('error', reject);

@@ -191,6 +191,7 @@ function _registerVideo() {
     return downloadVideo({
       url, outputPath, format, quality, filenameTemplate, conflictPolicy, embedMetadata, embedThumbnail,
       clipStartSeconds, clipEndSeconds,
+      cookiesPath: _store?.get('socialCookiesPath') || '',
     }, onProgress, _caps, _appDir);
   });
 }
